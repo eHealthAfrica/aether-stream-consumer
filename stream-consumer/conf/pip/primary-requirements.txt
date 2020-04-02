@@ -13,7 +13,6 @@ aet.consumer
 aether.python
 
 # Tests
-birdisle
 flake8
 mock
 pytest

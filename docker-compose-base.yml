@@ -2,7 +2,7 @@ version: "2.1"
 services:
   stream-consumer:
     image: ehealthafrica/aether-stream-consumer
-    build: ./consumer
+    build: ./stream-consumer
     stdin_open: true
     tty: true
     volumes:

@@ -26,8 +26,8 @@ setup(
     description='''An Aether Consumer to perform limited stream based jobs''',
     version='1.0.0',
     setup_requires=['pytest-runner'],
-    tests_require=['pytest', 'sqlalchemy', 'alembic', 'aet.consumer',
-                   'mock', 'aether_sdk_example'],
+    # tests_require=['pytest', 'sqlalchemy', 'alembic', 'aet.consumer',
+    #                'mock', 'aether_sdk_example'],
     url='https://github.com/eHealthAfrica/aether-stream-consumer',
     keywords=['aet', 'aether', 'kafka', 'consumer', 'zeebe'],
     classifiers=[]
