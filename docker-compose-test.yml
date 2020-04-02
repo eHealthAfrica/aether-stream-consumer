@@ -1,0 +1,26 @@
+version: "2.1"
+services:
+
+  consumer-test:
+    extends:
+      file: docker-compose-base.yml
+      service: stream-consumer
+    environment:
+      # consumer settings
+      CONSUMER_NAME: 'STREAM-TEST'
+      TENANCY_HEADER: x-oauth-realm
+      # redis
+      REDIS_PASSWORD: password
+      # kafka settings
+      KAFKA_CONFIG_PATH: /code/conf/consumer/kafka.json
+      KAFKA_URL: ${KAFKA_URL}
+      SECURITY.PROTOCOL: SASL_SSL
+      SASL.MECHANISM: PLAIN
+      SASL.USERNAME: ${KAFKA_SASL_USERNAME}
+      SASL.PASSWORD: ${KAFKA_SASL_PASSWORD}
+
+  redis:
+    image: redis:alpine
+    command: >
+      redis-server
+      --requirepass password

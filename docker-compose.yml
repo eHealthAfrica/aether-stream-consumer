@@ -1,0 +1,34 @@
+version: "2.1"
+services:
+
+  consumer:
+    extends:
+      file: docker-compose-base.yml
+      service: stream-consumer
+    ports:
+      - 9013:9013
+    environment:
+      # consumer settings
+      CONSUMER_NAME: 'STREAM'
+      TENANCY_HEADER: x-oauth-realm
+      # redis
+      REDIS_DB: 0
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: password
+      # kafka settings
+      KAFKA_CONFIG_PATH: /code/conf/consumer/kafka.json
+      KAFKA_URL: ${KAFKA_URL}
+      SECURITY.PROTOCOL: SASL_SSL
+      SASL.MECHANISM: PLAIN
+      SASL.USERNAME: ${KAFKA_SASL_USERNAME}
+      SASL.PASSWORD: ${KAFKA_SASL_PASSWORD}
+
+  redis:
+    image: redis:alpine
+    command: >
+      redis-server
+      --requirepass password
+      --appendonly yes
+      --auto-aof-rewrite-percentage 100
+      --auto-aof-rewrite-min-size 64mb
