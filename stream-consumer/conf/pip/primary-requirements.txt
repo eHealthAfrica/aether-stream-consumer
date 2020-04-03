@@ -11,6 +11,8 @@
 # Consumer
 aet.consumer
 aether.python
+requests
+zeebe_grpc
 
 # Tests
 flake8

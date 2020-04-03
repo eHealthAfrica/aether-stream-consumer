@@ -47,7 +47,7 @@ from aet.logger import get_logger
 from aether.python.avro import generation
 
 
-from app import artifacts, config, consumer
+from app import artifacts, config, consumer, helpers
 from app.fixtures import examples
 
 CONSUMER_CONFIG = config.consumer_config
@@ -68,6 +68,32 @@ TEST_TOPIC = 'firebase_test_topic'
 
 GENERATED_SAMPLES = {}
 # We don't want to initiate this more than once...
+
+
+@pytest.mark.integration
+@pytest.fixture(scope='session')
+def zeebe_config():
+    conf = helpers.ZeebeConfig(
+        url=os.environ['ZEEBE_ADDRESS'],
+        client_id=os.environ['ZEEBE_CLIENT_ID'],
+        client_secret=os.environ['ZEEBE_CLIENT_SECRET'],
+        audience=os.environ['ZEEBE_AUDIENCE'],
+        token_url=os.environ['ZEEBE_AUTHORIZATION_SERVER_URL']
+    )
+    yield conf
+
+
+@pytest.mark.integration
+@pytest.fixture(scope='session')
+def bad_zeebe_config():
+    conf = helpers.ZeebeConfig(
+        url=os.environ['ZEEBE_ADDRESS'],
+        client_id=os.environ['ZEEBE_CLIENT_ID'],
+        client_secret='bad',
+        audience=os.environ['ZEEBE_AUDIENCE'],
+        token_url=os.environ['ZEEBE_AUTHORIZATION_SERVER_URL']
+    )
+    yield conf
 
 
 @pytest.mark.unit

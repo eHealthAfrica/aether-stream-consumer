@@ -36,8 +36,13 @@ from . import *  # get all test assets from test/__init__.py
 
 
 @pytest.mark.integration
-def test__two():
-    assert(True)
+def test__two(zeebe_config, bad_zeebe_config):
+    conn = helpers.ZeebeConnection(zeebe_config)
+    res = conn.get_topology()
+    assert(res.brokers is not None)
+    bad_conn = helpers.ZeebeConnection(bad_zeebe_config)
+    with pytest.raises(requests.exceptions.HTTPError):
+        bad_conn.get_topology()
 
 
 # @pytest.mark.integration
