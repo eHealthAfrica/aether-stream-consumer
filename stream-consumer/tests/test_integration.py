@@ -31,9 +31,8 @@ from . import *  # get all test assets from test/__init__.py
 
 
 @pytest.mark.integration
-def test__two(zeebe_config, bad_zeebe_config):
-    conn = helpers.ZeebeConnection(zeebe_config)
-    res = next(conn.get_topology())
+def test__broker_connect(zeebe_connection, bad_zeebe_config):
+    res = next(zeebe_connection.get_topology())
     assert(res.brokers is not None)
     bad_conn = helpers.ZeebeConnection(bad_zeebe_config)
     with pytest.raises(requests.exceptions.HTTPError):
@@ -41,36 +40,20 @@ def test__two(zeebe_config, bad_zeebe_config):
 
 
 # @pytest.mark.integration
-# def test__consumer_add_firebase(LocalConsumer, RequestClientT1, RequestClientT2):
-#     res = RequestClientT1.post(f'{URL}/firebase/add', json=examples.FB_INSTANCE)
-#     assert(res.json() is True)
-#     res = RequestClientT1.get(f'{URL}/firebase/list')
-#     assert(res.json() != [])
-#     res = RequestClientT2.get(f'{URL}/firebase/list')
-#     assert(res.json() == [])
-#     res = RequestClientT1.delete(f'{URL}/firebase/delete?id=default')
-#     assert(res.json() is True)
-#     res = RequestClientT1.get(f'{URL}/firebase/list')
-#     assert(res.json() == [])
+# def test__deploy_workflow(zeebe_connection, bpmn_echo):
+#     res = next(zeebe_connection.deploy_workflow('echo', bpmn_echo))
+#     LOG.critical(res)
+
+@pytest.mark.integration
+def test__create_work(zeebe_connection):
+    for x in range(10, 20):
+        res = next(zeebe_connection.create_instance('flow', variables={'value': x}))
+        LOG.critical(res)
 
 
-# @pytest.mark.integration
-# def test__consumer_add_job(LocalConsumer, RequestClientT1):
-#     res = RequestClientT1.post(f'{URL}/job/add', json=examples.JOB)
-#     assert(res.json() is True)
-
-
-# @pytest.mark.integration
-# def test__consumer_add_subscription(LocalConsumer, RequestClientT1, cfs):
-#     res = RequestClientT1.post(f'{URL}/firebase/add', json=examples.FB_INSTANCE)
-#     assert(res.json() is True)
-#     res = RequestClientT1.post(f'{URL}/subscription/add', json=examples.SUBSCRIPTION)
-#     assert(res.json() is True)
-#     from time import sleep
-#     _path = examples.SUBSCRIPTION.get('fb_options').get('target_path').format(topic=TEST_TOPIC)
-#     for x in range(30):
-#         cfs_msg = helpers.read_cfs(cfs, _path)
-#         if cfs_msg:
-#             LOG.info(cfs_msg)
-#             return
-#         sleep(1)
+@pytest.mark.integration
+def test__do_some_work(zeebe_connection):
+    jobs = zeebe_connection.job_iterator('python-worker', 'lazyWorker', max=10)
+    for job in jobs:
+        LOG.critical(job.variables.get('value'))
+        job.fail()

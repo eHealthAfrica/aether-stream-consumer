@@ -115,18 +115,18 @@ class ZeebeConnection(object):
         )]
 
     @zboperation
-    def create_instance(self, process_id, version, variables=None, channel=None):
+    def create_instance(self, process_id, variables=None, version=1, channel=None):
         stub = gateway_pb2_grpc.GatewayStub(channel)
         return [stub.CreateWorkflowInstance(
             gateway_pb2.CreateWorkflowInstanceRequest(
                 bpmnProcessId=process_id,
-                version=-version,
-                variables=json.dumps(variables or {})
+                version=version,
+                variables=json.dumps(variables) if variables else json.dumps({})
             )
         )]
 
     @zboperation
-    def job_iterator(_type, worker_name, timeout=30, max=1, channel=None):
+    def job_iterator(self, _type, worker_name, timeout=30, max=1, channel=None):
         stub = gateway_pb2_grpc.GatewayStub(channel)
         activate_jobs_response = stub.ActivateJobs(
             gateway_pb2.ActivateJobsRequest(
@@ -150,13 +150,14 @@ def zb_connection_details(inst: ZeebeConnection):
 class ZeebeJob(object):
     def __init__(self, stub, job):
         self.key = job.key
-        self.variables = job.variables
+        self.variables = json.loads(job.variables)
         self.stub = stub
 
     def complete(self, variables=None):
         self.stub.CompleteJob(
             gateway_pb2.CompleteJobRequest(
-                jobKey=self.key, variables=json.dumps(variables or {})))
+                jobKey=self.key,
+                variables=json.dumps(variables) if variables else json.dumps({})))
 
     def fail(self):
         self.stub.FailJob(gateway_pb2.FailJobRequest(jobKey=self.key))

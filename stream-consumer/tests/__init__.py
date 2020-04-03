@@ -72,6 +72,13 @@ GENERATED_SAMPLES = {}
 
 @pytest.mark.integration
 @pytest.fixture(scope='session')
+def bpmn_echo():
+    with open('/code/bpmn/echo.bpmn', 'rb') as f:
+        yield f.read()
+
+
+@pytest.mark.integration
+@pytest.fixture(scope='session')
 def zeebe_config():
     conf = helpers.ZeebeConfig(
         url=os.environ['ZEEBE_ADDRESS'],
@@ -94,6 +101,12 @@ def bad_zeebe_config():
         token_url=os.environ['ZEEBE_AUTHORIZATION_SERVER_URL']
     )
     yield conf
+
+
+@pytest.mark.integration
+@pytest.fixture(scope='session')
+def zeebe_connection(zeebe_config):
+    yield helpers.ZeebeConnection(zeebe_config)
 
 
 @pytest.mark.unit
