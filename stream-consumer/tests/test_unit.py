@@ -22,7 +22,7 @@ from copy import copy
 
 from . import *  # get all test assets from test/__init__.py
 from app.fixtures import examples
-from app.artifacts import Subscription
+# from app.artifacts import Subscription
 
 # Test Suite contains both unit and integration tests
 # Unit tests can be run on their own from the root directory

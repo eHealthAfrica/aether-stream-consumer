@@ -70,7 +70,7 @@ class ZeebeInstance(BaseResource):
 
 
 class ZeebeSubscription(BaseResource):
-    schema = schemas.ZEEBE_SUBSCRIPTION
+    schema = schemas.PERMISSIVE
     name = 'zeebe_subscription'
     jobs_path = '$.zeebe_subscription'
 

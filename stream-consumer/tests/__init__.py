@@ -49,7 +49,6 @@ from aether.python.avro import generation
 
 from app import artifacts, config, consumer
 from app.fixtures import examples
-from app import helpers
 
 CONSUMER_CONFIG = config.consumer_config
 KAFKA_CONFIG = config.kafka_config
