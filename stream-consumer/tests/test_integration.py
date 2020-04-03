@@ -30,19 +30,14 @@ from . import *  # get all test assets from test/__init__.py
 # to run integration tests / all tests run the test_all.sh script from the /tests directory.
 
 
-# @pytest.mark.integration
-# def test__setup_consumer(LocalConsumer):
-#     print(LocalConsumer)
-
-
 @pytest.mark.integration
 def test__two(zeebe_config, bad_zeebe_config):
     conn = helpers.ZeebeConnection(zeebe_config)
-    res = conn.get_topology()
+    res = next(conn.get_topology())
     assert(res.brokers is not None)
     bad_conn = helpers.ZeebeConnection(bad_zeebe_config)
     with pytest.raises(requests.exceptions.HTTPError):
-        bad_conn.get_topology()
+        next(bad_conn.get_topology())
 
 
 # @pytest.mark.integration

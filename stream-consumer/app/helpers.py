@@ -19,14 +19,15 @@
 # under the License.
 
 from dataclasses import dataclass
+import json
 import grpc
 import requests
+# import types
 from zeebe_grpc import (
     gateway_pb2,
     gateway_pb2_grpc
 )
 # from aet.logger import get_logger
-
 # LOG = get_logger('helpers')
 
 
@@ -39,7 +40,7 @@ class ZeebeConfig:
     token_url: str
 
 
-def get_token(config: ZeebeConfig):
+def get_credentials(config: ZeebeConfig):
     body = {
         'client_id': config.client_id,
         'client_secret': config.client_secret,
@@ -49,6 +50,7 @@ def get_token(config: ZeebeConfig):
     res.raise_for_status()
     data = res.json()
     token = data['access_token']
+    # default certificates
     ssl_creds = grpc.ssl_channel_credentials()
     call_creds = grpc.access_token_call_credentials(token)
     composite_credentials = grpc.composite_channel_credentials(ssl_creds, call_creds)
@@ -56,6 +58,8 @@ def get_token(config: ZeebeConfig):
 
 
 def zboperation(fn):
+    # wraps zeebe operations for ZeebeConnnections in a context manager
+    # that handles auth / connection from the connection's ZeebeConfig
     def wrapper(*args, **kwargs):
         inst = args[0]
         try:
@@ -63,7 +67,10 @@ def zboperation(fn):
                 with grpc.secure_channel(
                         *zb_connection_details(inst)) as channel:
                     kwargs['channel'] = channel
-                    return fn(*args, **kwargs)
+                    res = fn(*args, **kwargs)
+                    # this is important for job_iterator to work
+                    # without exiting the secure_channel context
+                    yield from res
             except requests.exceptions.HTTPError as her:
                 # we have to catch this and re-raise as otherwise
                 # for some reason grpc._channel doesn't exist
@@ -74,7 +81,8 @@ def zboperation(fn):
                 with grpc.secure_channel(
                         *zb_connection_details(inst)) as channel:
                     kwargs['channel'] = channel
-                    return fn(*args, **kwargs)
+                    res = fn(*args, **kwargs)
+                    yield from res
         except requests.exceptions.HTTPError as her:
             raise her
     return wrapper
@@ -90,10 +98,65 @@ class ZeebeConnection(object):
     def get_topology(self, channel=None):
         stub = gateway_pb2_grpc.GatewayStub(channel)
         topology = stub.Topology(gateway_pb2.TopologyRequest())
-        return topology
+        return [topology]
+
+    @zboperation
+    def deploy_workflow(self, process_id, definition, channel=None):
+        stub = gateway_pb2_grpc.GatewayStub(channel)
+        workflow = gateway_pb2.WorkflowRequestObject(
+            name=process_id,
+            type=gateway_pb2.WorkflowRequestObject.BPMN,
+            definition=definition
+        )
+        return [stub.DeployWorkflow(
+            gateway_pb2.DeployWorkflowRequest(
+                workflows=[workflow]
+            )
+        )]
+
+    @zboperation
+    def create_instance(self, process_id, version, variables=None, channel=None):
+        stub = gateway_pb2_grpc.GatewayStub(channel)
+        return [stub.CreateWorkflowInstance(
+            gateway_pb2.CreateWorkflowInstanceRequest(
+                bpmnProcessId=process_id,
+                version=-version,
+                variables=json.dumps(variables or {})
+            )
+        )]
+
+    @zboperation
+    def job_iterator(_type, worker_name, timeout=30, max=1, channel=None):
+        stub = gateway_pb2_grpc.GatewayStub(channel)
+        activate_jobs_response = stub.ActivateJobs(
+            gateway_pb2.ActivateJobsRequest(
+                type=_type,
+                worker=worker_name,
+                timeout=timeout,
+                maxJobsToActivate=max
+            )
+        )
+        for response in activate_jobs_response:
+            for job in response.jobs:
+                yield ZeebeJob(stub, job)
 
 
 def zb_connection_details(inst: ZeebeConnection):
     if not inst.credentials:
-        inst.credentials = get_token(inst.config)
+        inst.credentials = get_credentials(inst.config)
     return [inst.config.url, inst.credentials]
+
+
+class ZeebeJob(object):
+    def __init__(self, stub, job):
+        self.key = job.key
+        self.variables = job.variables
+        self.stub = stub
+
+    def complete(self, variables=None):
+        self.stub.CompleteJob(
+            gateway_pb2.CompleteJobRequest(
+                jobKey=self.key, variables=json.dumps(variables or {})))
+
+    def fail(self):
+        self.stub.FailJob(gateway_pb2.FailJobRequest(jobKey=self.key))
