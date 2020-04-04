@@ -35,5 +35,16 @@ from app.fixtures import examples
 
 
 @pytest.mark.unit
+def test__Transformation_basic():
+    trans = artifacts.Transformation('_id', examples.BASE_TRANSFORMATION_PASS)
+    job = helpers.KafkaJob()
+    job.context = {'ref': 200}
+    assert(trans.run(job) == {'ref': 200})
+    job.context = {'ref': 500}
+    with pytest.raises(artifacts.TransformationException):
+        trans.run(job)
+
+
+@pytest.mark.unit
 def test__subscription_extended_validation():
     pass

@@ -151,6 +151,7 @@ class ZeebeJob(object):
     def __init__(self, stub, job):
         self.key = job.key
         self.variables = json.loads(job.variables)
+        self.context = {}
         self.stub = stub
 
     def complete(self, variables=None):
@@ -159,5 +160,21 @@ class ZeebeJob(object):
                 jobKey=self.key,
                 variables=json.dumps(variables) if variables else json.dumps({})))
 
-    def fail(self):
-        self.stub.FailJob(gateway_pb2.FailJobRequest(jobKey=self.key))
+    def fail(self, message=None):
+        self.stub.FailJob(gateway_pb2.FailJobRequest(
+            jobKey=self.key, errorMessage=message))
+
+
+# TODO implement for Kafka
+class KafkaJob(object):
+    def __init__(self, *args, **kwargs):
+        self.key = None
+        self.variables = None
+        self.context = {}
+        self.stub = None
+
+    def complete(self, *args, **kwargs):
+        pass
+
+    def fail(self, *args, **kwargs):
+        pass

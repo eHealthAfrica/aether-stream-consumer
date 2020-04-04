@@ -46,13 +46,21 @@ PIPELINE = {
 }
 
 BASE_TRANSFORMATION = {
-    'id',
-    'name',
-    'input_map',
-    'output_map',
-    'pass_condition',
-    'fail_condition'
+    'id': 'echo',
+    'name': 'echo',
+    'input_map': {'ref': '$.ref'},
+    'output_map': {'ref': '$.ref'}
 }
+
+BASE_TRANSFORMATION_PASS = dict(BASE_TRANSFORMATION)
+BASE_TRANSFORMATION_PASS.update({
+    'pass_condition': '$.ref.`match(200, null)`'
+})
+
+BASE_TRANSFORMATION_FAIL = dict(BASE_TRANSFORMATION)
+BASE_TRANSFORMATION_FAIL.update({
+    'fail_condition': '$.ref.`notmatch(200, null)`'
+})
 
 ZEEBE_JOB = {
     'id': 'zeebe-default',

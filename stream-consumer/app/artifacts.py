@@ -23,7 +23,8 @@
 from time import sleep
 from typing import (
     Dict,
-    Tuple
+    Tuple,
+    Union
 )
 #     Any,
 #     Callable,
@@ -37,6 +38,7 @@ from typing import (
 from aet.exceptions import ConsumerHttpException
 from aet.job import BaseJob, JobStatus
 from aet.logger import get_logger
+from aet.jsonpath import CachedParser
 from aet.resource import BaseResource, lock
 
 # Aether python lib
@@ -44,6 +46,7 @@ from aet.resource import BaseResource, lock
 
 from app.config import get_consumer_config, get_kafka_config
 from app.fixtures import schemas
+from app import helpers
 
 # from app import helpers
 
@@ -88,8 +91,20 @@ class Transformation(BaseResource):
     jobs_path = None
 
     @staticmethod
+    def handle_parser_results(matches):
+        if matches:
+            if len(matches) > 1:
+                return [i.value for i in matches]
+            else:
+                return [i.value for i in matches][0]
+
+    @staticmethod
     def apply_map(map: Dict, context: Dict) -> Dict:
-        pass
+        return {
+            k: Transformation.handle_parser_results(
+                CachedParser.find(v, context)) for
+            k, v in map.items()
+        }
 
     def _get_local_context(self, input_context: Dict) -> Dict:
         return Transformation.apply_map(
@@ -99,12 +114,14 @@ class Transformation(BaseResource):
         return Transformation.apply_map(
             self.definition.output_map, result)
 
-    def run(self, input_context) -> Dict:
+    def run(self, job: Union[helpers.ZeebeJob, helpers.KafkaJob]) -> Dict:
+        input_context = job.context
         try:
             local_context = self._get_local_context(input_context)
             result = self.do_work(local_context)
             output = self._format_output(result)
             self.check_failure(output)
+            return output
         except Exception as err:
             raise TransformationException(err)
 
@@ -112,15 +129,23 @@ class Transformation(BaseResource):
         # echo for basic testing
         return local_context
 
-    def check_failure(self, ouput: Dict):
+    def check_failure(self, output: Dict):
         path, result = self._get_evaluation_condition()
         if not path:
             return
+        # raises Error on failure
+        self._evaluate_condition(path, result, output)
 
-        # make sure only one condition is set
-        # evaluate condition based on jsonpath expression
-        # fails pass_condition, or triggers fail_condition
-        raise ValueError('reason for failing')
+    def _evaluate_condition(self, path, expected, data):
+        res = Transformation.handle_parser_results(
+            CachedParser.find(path, data))
+        if res is expected:
+            return
+        raw_path = path.split('.`')[0]
+        checksum = Transformation.handle_parser_results(
+            CachedParser.find(raw_path, data))
+        raise ValueError(f'Expected {checksum} at path {raw_path} to evaluate '
+                         f'to {expected} from expression {path}, got {res}')
 
     def _get_evaluation_condition(self) -> Tuple[str, bool]:
         if hasattr(self.definition, 'pass_condition'):
@@ -139,6 +164,20 @@ class JobComplete(Transformation):
     '''
     name = 'jobcomplete'
     pass
+
+    def run(self, input_context) -> Dict:
+        try:
+            local_context = self._get_local_context(input_context)
+            result = self.do_work(local_context)
+            output = self._format_output(result)
+            self.check_failure(output)
+            return output
+        except Exception as err:
+            raise TransformationException(err)
+
+    def do_work(self, local_context) -> Dict:
+        # echo for basic testing
+        return local_context
 
 
 class JobSpawn(Transformation):
