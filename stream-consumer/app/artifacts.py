@@ -21,12 +21,15 @@
 # import fnmatch
 # import json
 from time import sleep
-# from typing import (
+from typing import (
+    Dict,
+    Tuple
+)
 #     Any,
 #     Callable,
 #     List,
 #     Mapping
-# )
+
 
 # from confluent_kafka import KafkaException
 
@@ -75,10 +78,74 @@ class ZeebeSubscription(BaseResource):
     jobs_path = '$.zeebe_subscription'
 
 
-class Computation(BaseResource):
+class TransformationException(Exception):
+    pass
+
+
+class Transformation(BaseResource):
     schema = schemas.PERMISSIVE
-    name = 'computation'
+    name = '__transformation'  # should not be directly created...
     jobs_path = None
+
+    @staticmethod
+    def apply_map(map: Dict, context: Dict) -> Dict:
+        pass
+
+    def _get_local_context(self, input_context: Dict) -> Dict:
+        return Transformation.apply_map(
+            self.definition.input_map, input_context)
+
+    def _format_output(self, result: Dict) -> Dict:
+        return Transformation.apply_map(
+            self.definition.output_map, result)
+
+    def run(self, input_context) -> Dict:
+        try:
+            local_context = self._get_local_context(input_context)
+            result = self.do_work(local_context)
+            output = self._format_output(result)
+            self.check_failure(output)
+        except Exception as err:
+            raise TransformationException(err)
+
+    def do_work(self, local_context) -> Dict:
+        # echo for basic testing
+        return local_context
+
+    def check_failure(self, ouput: Dict):
+        path, result = self._get_evaluation_condition()
+        if not path:
+            return
+
+        # make sure only one condition is set
+        # evaluate condition based on jsonpath expression
+        # fails pass_condition, or triggers fail_condition
+        raise ValueError('reason for failing')
+
+    def _get_evaluation_condition(self) -> Tuple[str, bool]:
+        if hasattr(self.definition, 'pass_condition'):
+            return (self.definition.pass_condition, True)
+        elif hasattr(self.definition, 'fail_condition'):
+            return (self.definition.fail_condition, False)
+        # if no conditions, this stage always passes
+        return (None, True)
+
+
+class JobComplete(Transformation):
+    '''
+        Check if a condition is met.
+        Uses input_map to prepare output for job.
+        Completes job
+    '''
+    name = 'jobcomplete'
+    pass
+
+
+class JobSpawn(Transformation):
+    '''
+
+    '''
+    pass
 
 
 class RestCallout(BaseResource):

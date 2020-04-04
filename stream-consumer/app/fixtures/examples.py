@@ -45,6 +45,15 @@ PIPELINE = {
     ]
 }
 
+BASE_TRANSFORMATION = {
+    'id',
+    'name',
+    'input_map',
+    'output_map',
+    'pass_condition',
+    'fail_condition'
+}
+
 ZEEBE_JOB = {
     'id': 'zeebe-default',
     'name': 'Default Stream Consumer Job',

@@ -28,7 +28,7 @@ from zeebe_grpc import (
     gateway_pb2_grpc
 )
 # from aet.logger import get_logger
-# LOG = get_logger('helpers')
+# LOG = get_logger('zeebe')
 
 
 @dataclass
