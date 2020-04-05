@@ -23,8 +23,7 @@
 from time import sleep
 from typing import (
     Dict,
-    Tuple,
-    Union
+    Tuple
 )
 #     Any,
 #     Callable,
@@ -114,8 +113,8 @@ class Transformation(BaseResource):
         return Transformation.apply_map(
             self.definition.output_map, result)
 
-    def run(self, job: Union[helpers.ZeebeJob, helpers.KafkaJob]) -> Dict:
-        input_context = job.context
+    def run(self, context: helpers.PipelineContext) -> Dict:
+        input_context = context.last()
         try:
             local_context = self._get_local_context(input_context)
             result = self.do_work(local_context)
@@ -125,7 +124,7 @@ class Transformation(BaseResource):
         except Exception as err:
             raise TransformationException(err)
 
-    def do_work(self, local_context) -> Dict:
+    def do_work(self, local_context: Dict) -> Dict:
         # echo for basic testing
         return local_context
 
@@ -156,16 +155,17 @@ class Transformation(BaseResource):
         return (None, True)
 
 
-class JobComplete(Transformation):
+class ZeebeComplete(Transformation):
     '''
         Check if a condition is met.
         Uses input_map to prepare output for job.
         Completes job
     '''
-    name = 'jobcomplete'
+    name = 'zeebecomplete'
     pass
 
-    def run(self, input_context) -> Dict:
+    def run(self, context: helpers.PipelineContext) -> Dict:
+        input_context = context.last()
         try:
             local_context = self._get_local_context(input_context)
             result = self.do_work(local_context)

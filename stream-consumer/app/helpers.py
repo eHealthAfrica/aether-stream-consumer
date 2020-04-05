@@ -18,11 +18,12 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from collections import OrderedDict
 from dataclasses import dataclass
 import json
 import grpc
 import requests
-# import types
+from typing import (Dict, List)  # noqa
 from zeebe_grpc import (
     gateway_pb2,
     gateway_pb2_grpc
@@ -147,11 +148,14 @@ def zb_connection_details(inst: ZeebeConnection):
     return [inst.config.url, inst.credentials]
 
 
-class ZeebeJob(object):
+class Event(object):
+    pass
+
+
+class ZeebeJob(Event):
     def __init__(self, stub, job):
         self.key = job.key
         self.variables = json.loads(job.variables)
-        self.context = {}
         self.stub = stub
 
     def complete(self, variables=None):
@@ -166,15 +170,30 @@ class ZeebeJob(object):
 
 
 # TODO implement for Kafka
-class KafkaJob(object):
+class KafkaMessage(Event):
     def __init__(self, *args, **kwargs):
-        self.key = None
-        self.variables = None
-        self.context = {}
-        self.stub = None
+        pass
 
     def complete(self, *args, **kwargs):
         pass
 
     def fail(self, *args, **kwargs):
         pass
+
+
+class PipelineContext(object):
+
+    def __init__(self, event: Event = None):
+        self.data: OrderedDict[str, Dict] = {}
+        if isinstance(event, ZeebeJob):
+            self.register_result('source', event.variables)
+        self.source_event = event
+
+    def register_result(self, _id, result):
+        self.data[_id] = result
+
+    def last(self) -> Dict:
+        return self.data.get(list(self.data.keys())[-1])
+
+    def to_json(self):
+        return json.dumps(self.data)
