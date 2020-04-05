@@ -23,6 +23,7 @@ from dataclasses import dataclass
 import json
 import grpc
 import requests
+from requests.auth import HTTPBasicAuth
 from typing import (Dict, List, TYPE_CHECKING)  # noqa
 from urllib.parse import urlparse
 from zeebe_grpc import (
@@ -240,6 +241,18 @@ class RestHelper(object):
 
     resolver: dns.resolver.Resolver = None
     dns_cache = {}
+    rest_calls = {  # Available calls mirrored in json schema
+        'HEAD': requests.head,
+        'GET': requests.get,
+        'POST': requests.post,
+        'PUT': requests.put,
+        'DELETE': requests.delete,
+        'OPTIONS': requests.options
+    }
+
+    @classmethod
+    def request_type(cls, name: str):
+        return cls.rest_calls.get(name)
 
     @classmethod
     def resolve(cls, url) -> bool:
@@ -256,10 +269,39 @@ class RestHelper(object):
             cls.resolver.query(host)
             cls.dns_cache[host] = True
             return True
-        except dns.resolver.NXDOMAIN as err:
-            LOG.debug(err)
+        except dns.resolver.NXDOMAIN:
             cls.dns_cache[host] = False
+            return False
+        except dns.resolver.NoAnswer:
+            # probably malformed netloc, don't cache just in case.
             return False
 
     def __init__(self, res: ResourceDefinition = None):
         pass
+
+    def request(self, config):
+        # we can template the url with other config elements
+        url = config.get('url').format(**config)
+        method = config.get('method').upper()
+        fn = self.rest_calls[method]
+        auth = config.get('basic_auth')
+        if auth:
+            auth = HTTPBasicAuth(auth['user'], auth['password'])
+        token = config.get('token', {})
+        if token:
+            token = {'Authorization': f'access_token {token}'}
+        headers = config.get('headers', {})
+        headers = {**token, **headers}  # merge in token if we have one
+        request_kwargs = {
+            'auth': auth,
+            'headers': headers,
+            'params': config.get('query_params'),
+            'json': config.get('json_body'),
+            'data': config.get('form_body'),
+            'verify': False
+        }
+        if not config.get('mock_request', False):
+            return fn(
+                url,
+                **request_kwargs
+            )

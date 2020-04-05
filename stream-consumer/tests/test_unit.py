@@ -61,6 +61,7 @@ def test__xf_ZeebeComplete_basic():
 @pytest.mark.unit
 def test__xf_request_dns():
     queries = [
+        ('I am not a valid url! @#*@...', False),
         ('https://docker.local', False),
         ('http://localhost', False),
         ('https://google.com', True),

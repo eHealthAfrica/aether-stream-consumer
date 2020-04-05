@@ -229,16 +229,36 @@ class ZeebeSpawn(Transformation):
         return {'success': True}
 
 
-class RestCallout(BaseResource):
+class RestCall(BaseResource):
     schema = schemas.PERMISSIVE
-    name = 'restcallout'
+    name = 'restcall'
     jobs_path = None
 
     def _on_init(self):
         self.rest_helper = RestHelper(self.definition)
+        self.definition_dict = {'definition': {k: v for k, v in self.definition.items()}}
+
+    def _get_local_context(self, input_context: Dict) -> Dict:
+        _base_vars = Transformation.apply_map(
+            self.definition.input_map, self.definition_dict)
+        for k, v in Transformation.apply_map(self.definition.input_map, input_context).items():
+            if v:
+                _base_vars.update(k, v)
+
+    def _format_output(self, result: Dict) -> Dict:
+        return Transformation.apply_map(
+            self.definition.output_map, result)
 
     def run(self, context: PipelineContext) -> Dict:
-        pass
+        input_context = context.data
+        try:
+            local_context = self._get_local_context(input_context)
+            result = self.do_work(local_context)
+            output = self._format_output(result)
+            self.check_failure(output)
+            return output
+        except Exception as err:
+            raise TransformationError(err)
 
 
 class Pipeline(BaseResource):
