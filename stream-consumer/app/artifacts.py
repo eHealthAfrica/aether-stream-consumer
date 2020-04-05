@@ -45,7 +45,12 @@ from aet.resource import BaseResource, lock
 
 from app.config import get_consumer_config, get_kafka_config
 from app.fixtures import schemas
-from app import helpers
+from app.helpers import (
+    PipelineContext,
+    TestEvent,
+    TransformationError,
+    ZeebeJob
+)
 
 # from app import helpers
 
@@ -80,10 +85,6 @@ class ZeebeSubscription(BaseResource):
     jobs_path = '$.zeebe_subscription'
 
 
-class TransformationException(Exception):
-    pass
-
-
 class Transformation(BaseResource):
     schema = schemas.PERMISSIVE
     name = '__transformation'  # should not be directly created...
@@ -113,7 +114,7 @@ class Transformation(BaseResource):
         return Transformation.apply_map(
             self.definition.output_map, result)
 
-    def run(self, context: helpers.PipelineContext) -> Dict:
+    def run(self, context: PipelineContext) -> Dict:
         input_context = context.last()
         try:
             local_context = self._get_local_context(input_context)
@@ -122,7 +123,7 @@ class Transformation(BaseResource):
             self.check_failure(output)
             return output
         except Exception as err:
-            raise TransformationException(err)
+            raise TransformationError(err)
 
     def do_work(self, local_context: Dict) -> Dict:
         # echo for basic testing
@@ -162,29 +163,47 @@ class ZeebeComplete(Transformation):
         Completes job
     '''
     name = 'zeebecomplete'
-    pass
 
-    def run(self, context: helpers.PipelineContext) -> Dict:
-        input_context = context.last()
+    def run(self, context: PipelineContext) -> Dict:
+        input_context = context.data
         try:
+            job = context.source_event
             local_context = self._get_local_context(input_context)
-            result = self.do_work(local_context)
-            output = self._format_output(result)
-            self.check_failure(output)
-            return output
+            # failure / pass based on global context
+            self.check_failure(input_context)
+            if isinstance(job, TestEvent):
+                return local_context
+            if not isinstance(job, ZeebeJob):
+                raise TypeError('Expected source event to be ZeebeJob'
+                                f' found {type(job)}.')
+            job.complete(variables=local_context)
+            return local_context
         except Exception as err:
-            raise TransformationException(err)
-
-    def do_work(self, local_context) -> Dict:
-        # echo for basic testing
-        return local_context
+            raise TransformationError(err)
 
 
-class JobSpawn(Transformation):
+class ZeebeSpawn(Transformation):
     '''
 
     '''
-    pass
+    name = 'zeebespawn'
+
+    def run(self, context: PipelineContext) -> Dict:
+        try:
+            if context.zeebe is None:
+                raise RuntimeError('Expected pipeline context to have '
+                                   ' a ZeebeConnection, found None')
+            # has all context
+            input_context = context.data
+            local_context = self._get_local_context(input_context)
+            # failure / pass based on global context
+            self.check_failure(input_context)
+            wf_name = self.definition.workflow_name
+            res = next(context.zeebe.create_instance(wf_name, variables=local_context))
+            LOG.info(res)
+            return {'success': True}
+        except Exception as err:
+            raise TransformationError(err)
 
 
 class RestCallout(BaseResource):
@@ -205,7 +224,7 @@ class ZeebeSink(BaseResource):
     jobs_path = None
 
 
-class ZeebeJob(BaseJob):
+class Job(BaseJob):
     name = 'job'
     _resources = [ZeebeInstance, ZeebeSubscription, Pipeline]
     schema = schemas.PERMISSIVE

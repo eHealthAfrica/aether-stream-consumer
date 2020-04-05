@@ -46,14 +46,27 @@ def test__broker_connect(zeebe_connection, bad_zeebe_config):
 
 @pytest.mark.integration
 def test__create_work(zeebe_connection):
-    for x in range(10, 20):
-        res = next(zeebe_connection.create_instance('flow', variables={'value': x}))
-        LOG.critical(res)
+    xf = artifacts.ZeebeSpawn('_id', examples.XF_ZEEBE_SPAWN)
+    context = helpers.PipelineContext(
+        helpers.TestEvent(),
+        zeebe_connection
+    )
+    for x in range(10, 25):
+        context.data = {'source': {'ref': x, 'status': 200}}
+        res = xf.run(context)
+        LOG.debug(res)
+    with pytest.raises(artifacts.TransformationError):
+        context.data = {'source': {'ref': x, 'status': 500}}
+        res = xf.run(context)
 
 
 @pytest.mark.integration
 def test__do_some_work(zeebe_connection):
-    jobs = zeebe_connection.job_iterator('python-worker', 'lazyWorker', max=10)
+    jobs = zeebe_connection.job_iterator('python-worker', 'lazyWorker', max=100)
     for job in jobs:
-        LOG.critical(job.variables.get('value'))
-        job.fail()
+        try:
+            job.fail()
+            LOG.debug(job.variables)
+        except Exception as aer:
+            LOG.error(job.variables)
+            LOG.critical(aer)

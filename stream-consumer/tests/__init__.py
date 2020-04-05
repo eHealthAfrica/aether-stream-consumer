@@ -46,7 +46,6 @@ from aet.logger import get_logger
 
 from aether.python.avro import generation
 
-
 from app import artifacts, config, consumer, helpers
 from app.fixtures import examples
 

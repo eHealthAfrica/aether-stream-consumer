@@ -22,7 +22,7 @@ from copy import copy
 
 from . import *  # get all test assets from test/__init__.py
 from app.fixtures import examples
-# from app.artifacts import Subscription
+from app import artifacts
 
 # Test Suite contains both unit and integration tests
 # Unit tests can be run on their own from the root directory
@@ -38,6 +38,20 @@ from app.fixtures import examples
 def test__Transformation_basic():
     trans = artifacts.Transformation('_id', examples.BASE_TRANSFORMATION_PASS)
     context = helpers.PipelineContext()
+    context.register_result('source', {'ref': 200})
+    assert(trans.run(context) == {'ref': 200})
+    context.register_result('source', {'ref': 500})
+    with pytest.raises(artifacts.TransformationException):
+        trans.run(context)
+
+
+@pytest.mark.unit
+def test__xf_ZeebeComplete_basic():
+    _def = dict(examples.BASE_TRANSFORMATION_PASS)
+    _def['input_map'] = {'ref': '$.source.ref'}
+    _def['pass_condition'] = '$.source.ref.`match(200, null)`'
+    trans = artifacts.ZeebeComplete('_id', _def)
+    context = helpers.PipelineContext(helpers.TestEvent())
     context.register_result('source', {'ref': 200})
     assert(trans.run(context) == {'ref': 200})
     context.register_result('source', {'ref': 500})

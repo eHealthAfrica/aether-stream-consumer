@@ -62,6 +62,14 @@ BASE_TRANSFORMATION_FAIL.update({
     'fail_condition': '$.ref.`notmatch(200, null)`'
 })
 
+XF_ZEEBE_SPAWN = {
+    'id': 'echo',
+    'name': 'echo',
+    'workflow_name': 'flow',
+    'pass_condition': '$.source.status.`match(200, null)`',
+    'input_map': {'ref': '$.source.ref'}
+}
+
 ZEEBE_JOB = {
     'id': 'zeebe-default',
     'name': 'Default Stream Consumer Job',

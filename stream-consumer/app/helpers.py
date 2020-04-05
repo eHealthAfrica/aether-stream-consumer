@@ -23,13 +23,20 @@ from dataclasses import dataclass
 import json
 import grpc
 import requests
-from typing import (Dict, List)  # noqa
+from typing import (Dict, List, TYPE_CHECKING)  # noqa
 from zeebe_grpc import (
     gateway_pb2,
     gateway_pb2_grpc
 )
+
+# if TYPE_CHECKING:
+#     from app.artifacts import Transformation
 # from aet.logger import get_logger
 # LOG = get_logger('zeebe')
+
+
+class TransformationError(Exception):
+    pass
 
 
 @dataclass
@@ -149,6 +156,12 @@ def zb_connection_details(inst: ZeebeConnection):
 
 
 class Event(object):
+    def __init__(self, *args, **kwargs):
+        pass
+
+
+class TestEvent(Event):
+    # used for interactive testing
     pass
 
 
@@ -171,19 +184,19 @@ class ZeebeJob(Event):
 
 # TODO implement for Kafka
 class KafkaMessage(Event):
-    def __init__(self, *args, **kwargs):
-        pass
-
-    def complete(self, *args, **kwargs):
-        pass
-
-    def fail(self, *args, **kwargs):
-        pass
+    pass
 
 
 class PipelineContext(object):
 
-    def __init__(self, event: Event = None):
+    def __init__(
+        self,
+        event: Event = None,
+        zeebe: ZeebeConnection = None,
+        kafka=None  # Kafka instance (TODO add type)
+    ):
+        self.zeebe = zeebe
+        self.kafka = kafka
         self.data: OrderedDict[str, Dict] = {}
         if isinstance(event, ZeebeJob):
             self.register_result('source', event.variables)
@@ -197,3 +210,23 @@ class PipelineContext(object):
 
     def to_json(self):
         return json.dumps(self.data)
+
+
+class PipelineSet(object):
+    def __init__(
+        self,
+        context: PipelineContext = None,
+        stages=None  # List[Transformation] = None
+    ):
+        self.context = context
+        self.stages = stages
+
+    def run(self, stop_on_error=True):
+        for stage in self.stages:
+            try:
+                stage_id = stage.id  # TODO see if ID format makes sense for this. Can use name?
+                # can also make method...
+                result = stage.run(self.context)
+                self.context.register_result(stage_id, result)
+            except TransformationError as ter:
+                raise ter
