@@ -41,7 +41,7 @@ def test__Transformation_basic():
     context.register_result('source', {'ref': 200})
     assert(trans.run(context) == {'ref': 200})
     context.register_result('source', {'ref': 500})
-    with pytest.raises(artifacts.TransformationException):
+    with pytest.raises(helpers.TransformationError):
         trans.run(context)
 
 
@@ -55,8 +55,19 @@ def test__xf_ZeebeComplete_basic():
     context.register_result('source', {'ref': 200})
     assert(trans.run(context) == {'ref': 200})
     context.register_result('source', {'ref': 500})
-    with pytest.raises(artifacts.TransformationException):
+    with pytest.raises(helpers.TransformationError):
         trans.run(context)
+
+@pytest.mark.unit
+def test__xf_request_dns():
+    queries = [
+        ('https://docker.local', False),
+        ('http://localhost', False),
+        ('https://google.com', True),
+        ('https://google.com/imaginary/url.html', True)
+    ]
+    for q, expect in queries:
+        assert(helpers.RestHelper.resolve(q) is expect)
 
 
 @pytest.mark.unit

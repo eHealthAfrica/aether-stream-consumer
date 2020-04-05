@@ -11,6 +11,7 @@
 # Consumer
 aet.consumer
 aether.python
+dnspython
 requests
 zeebe_grpc
 

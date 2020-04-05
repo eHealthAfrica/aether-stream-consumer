@@ -66,6 +66,9 @@ XF_ZEEBE_SPAWN = {
     'id': 'echo',
     'name': 'echo',
     'workflow_name': 'flow',
+    'spawn_mode': 'single',  # or multiple
+    'iterable_source': '$.source.all_messages',
+    'iterable_dest': 'message',
     'pass_condition': '$.source.status.`match(200, null)`',
     'input_map': {'ref': '$.source.ref'}
 }

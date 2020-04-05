@@ -51,13 +51,25 @@ def test__create_work(zeebe_connection):
         helpers.TestEvent(),
         zeebe_connection
     )
-    for x in range(10, 25):
+    # single mode
+    for x in range(0, 5):
         context.data = {'source': {'ref': x, 'status': 200}}
         res = xf.run(context)
         LOG.debug(res)
-    with pytest.raises(artifacts.TransformationError):
+    with pytest.raises(helpers.TransformationError):
         context.data = {'source': {'ref': x, 'status': 500}}
         res = xf.run(context)
+    # multimode
+    messages = [{'res': v} for v in range(10, 15)]
+    xf.definition.input_map = {'ref': '$.message'}
+    xf.definition.spawn_mode = 'multiple'
+    context.data = {
+        'source': {
+            'status': 200,
+            'all_messages': messages}
+    }
+    res = xf.run(context)
+    LOG.debug(res)
 
 
 @pytest.mark.integration

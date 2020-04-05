@@ -24,15 +24,19 @@ import json
 import grpc
 import requests
 from typing import (Dict, List, TYPE_CHECKING)  # noqa
+from urllib.parse import urlparse
 from zeebe_grpc import (
     gateway_pb2,
     gateway_pb2_grpc
 )
+import dns.resolver
+
+from aet.resource import ResourceDefinition
 
 # if TYPE_CHECKING:
 #     from app.artifacts import Transformation
-# from aet.logger import get_logger
-# LOG = get_logger('zeebe')
+from aet.logger import get_logger
+LOG = get_logger('zeebe')
 
 
 class TransformationError(Exception):
@@ -230,3 +234,32 @@ class PipelineSet(object):
                 self.context.register_result(stage_id, result)
             except TransformationError as ter:
                 raise ter
+
+
+class RestHelper(object):
+
+    resolver: dns.resolver.Resolver = None
+    dns_cache = {}
+
+    @classmethod
+    def resolve(cls, url) -> bool:
+        # using a specified DNS resolver to check hosts
+        # keeps people from using this tool on the internal K8s network
+        if not cls.resolver:
+            cls.resolver = dns.resolver.Resolver()
+            cls.resolver.nameservers = ['8.8.8.8', '8.8.4.4']
+        url_obj = urlparse(url)
+        host = url_obj.netloc
+        if host in cls.dns_cache:
+            return cls.dns_cache[host]
+        try:
+            cls.resolver.query(host)
+            cls.dns_cache[host] = True
+            return True
+        except dns.resolver.NXDOMAIN as err:
+            LOG.debug(err)
+            cls.dns_cache[host] = False
+            return False
+
+    def __init__(self, res: ResourceDefinition = None):
+        pass

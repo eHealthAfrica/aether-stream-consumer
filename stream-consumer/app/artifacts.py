@@ -21,8 +21,10 @@
 # import fnmatch
 # import json
 from time import sleep
-from typing import (
+from typing import (  # noqa
     Dict,
+    List,
+    Iterable,
     Tuple
 )
 #     Any,
@@ -47,6 +49,7 @@ from app.config import get_consumer_config, get_kafka_config
 from app.fixtures import schemas
 from app.helpers import (
     PipelineContext,
+    RestHelper,
     TestEvent,
     TransformationError,
     ZeebeJob
@@ -195,21 +198,47 @@ class ZeebeSpawn(Transformation):
                                    ' a ZeebeConnection, found None')
             # has all context
             input_context = context.data
-            local_context = self._get_local_context(input_context)
             # failure / pass based on global context
             self.check_failure(input_context)
+            local_context_iter = self._get_local_context(input_context)
             wf_name = self.definition.workflow_name
-            res = next(context.zeebe.create_instance(wf_name, variables=local_context))
-            LOG.info(res)
+            for local_context in local_context_iter:
+                self._handle_spawn(wf_name, local_context, context.zeebe)
             return {'success': True}
         except Exception as err:
             raise TransformationError(err)
+
+    def _get_local_context(self, input_context: Dict) -> Iterable[Dict]:
+        if self.definition.spawn_mode == 'multiple':
+            path = self.definition.iterable_source
+            out_path = self.definition.iterable_dest
+            res = Transformation.handle_parser_results(
+                CachedParser.find(path, input_context))
+            for i in res:
+                input_context[out_path] = i
+                yield Transformation.apply_map(
+                    self.definition.input_map, input_context)
+            del input_context[out_path]
+        else:
+            yield Transformation.apply_map(
+                self.definition.input_map, input_context)
+
+    def _handle_spawn(self, wf_name, local_context, zeebe):
+        res = next(zeebe.create_instance(wf_name, variables=local_context))
+        LOG.info(res)
+        return {'success': True}
 
 
 class RestCallout(BaseResource):
     schema = schemas.PERMISSIVE
     name = 'restcallout'
     jobs_path = None
+
+    def _on_init(self):
+        self.rest_helper = RestHelper(self.definition)
+
+    def run(self, context: PipelineContext) -> Dict:
+        pass
 
 
 class Pipeline(BaseResource):
