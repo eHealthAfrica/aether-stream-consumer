@@ -19,7 +19,7 @@
 # under the License.
 
 # import fnmatch
-# import json
+import json  # noqa
 from time import sleep
 from typing import (  # noqa
     Dict,
@@ -118,7 +118,7 @@ class Transformation(BaseResource):
             self.definition.output_map, result)
 
     def run(self, context: PipelineContext) -> Dict:
-        input_context = context.last()
+        input_context = self._get_context_scope(context)
         try:
             local_context = self._get_local_context(input_context)
             result = self.do_work(local_context)
@@ -127,6 +127,9 @@ class Transformation(BaseResource):
             return output
         except Exception as err:
             raise TransformationError(err)
+
+    def _get_context_scope(self, context: PipelineContext) -> Dict:
+        return context.last()
 
     def do_work(self, local_context: Dict) -> Dict:
         # echo for basic testing
@@ -229,48 +232,41 @@ class ZeebeSpawn(Transformation):
         return {'success': True}
 
 
-class RestCall(BaseResource):
+class RestCall(Transformation):
     schema = schemas.PERMISSIVE
     name = 'restcall'
     jobs_path = None
 
     def _on_init(self):
-        self.rest_helper = RestHelper(self.definition)
+        self.rest_helper = RestHelper()
         self.definition_dict = {'definition': {k: v for k, v in self.definition.items()}}
 
     def _get_local_context(self, input_context: Dict) -> Dict:
         _base_vars = Transformation.apply_map(
             self.definition.input_map, self.definition_dict)
-        for k, v in Transformation.apply_map(self.definition.input_map, input_context).items():
-            if v:
-                _base_vars.update(k, v)
+        updates = {
+            k: v for k, v in Transformation.apply_map(
+                self.definition.input_map, input_context
+            ).items() if v is not None
+        }
+        _base_vars.update(updates)
+        return _base_vars
 
     def _format_output(self, result: Dict) -> Dict:
         return Transformation.apply_map(
             self.definition.output_map, result)
 
-    def run(self, context: PipelineContext) -> Dict:
-        input_context = context.data
-        try:
-            local_context = self._get_local_context(input_context)
-            result = self.do_work(local_context)
-            output = self._format_output(result)
-            self.check_failure(output)
-            return output
-        except Exception as err:
-            raise TransformationError(err)
+    def _get_context_scope(self, context: PipelineContext) -> Dict:
+        return context.data
+
+    def do_work(self, local_context: Dict) -> Dict:
+        return self.rest_helper.request(**local_context)
 
 
 class Pipeline(BaseResource):
     schema = schemas.PERMISSIVE
     name = 'pipeline'
     jobs_path = '$.pipeline'
-
-
-class ZeebeSink(BaseResource):
-    schema = schemas.PERMISSIVE
-    name = 'zeebesink'
-    jobs_path = None
 
 
 class Job(BaseJob):

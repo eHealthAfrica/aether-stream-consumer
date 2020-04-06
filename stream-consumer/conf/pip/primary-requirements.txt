@@ -12,6 +12,7 @@
 aet.consumer
 aether.python
 dnspython
+quickjs
 requests
 zeebe_grpc
 

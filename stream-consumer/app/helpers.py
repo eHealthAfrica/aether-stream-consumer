@@ -22,9 +22,10 @@ from collections import OrderedDict
 from dataclasses import dataclass
 import json
 import grpc
+import quickjs
 import requests
 from requests.auth import HTTPBasicAuth
-from typing import (Dict, List, TYPE_CHECKING)  # noqa
+from typing import (Any, Dict, List, TYPE_CHECKING)  # noqa
 from urllib.parse import urlparse
 from zeebe_grpc import (
     gateway_pb2,
@@ -237,6 +238,16 @@ class PipelineSet(object):
                 raise ter
 
 
+def check_required(f):
+    def wrapper(*args, **kwargs):
+        required = args[0].required
+        missing = [i for i in required if kwargs.get(i) is None]
+        if missing:
+            raise RuntimeError(f'Expected all required fields, missing {missing}')
+        return f(*args, **kwargs)
+    return wrapper
+
+
 class RestHelper(object):
 
     resolver: dns.resolver.Resolver = None
@@ -249,6 +260,37 @@ class RestHelper(object):
         'DELETE': requests.delete,
         'OPTIONS': requests.options
     }
+
+    required = [
+        'method',
+        'url'
+    ]
+
+    success_keys = [
+        'encoding',
+        'headers',
+        'status_code',
+        'text'
+    ]
+
+    failure_keys = [
+        'encoding',
+        'reason',
+        'status_code'
+    ]
+
+    @classmethod
+    def response_to_dict(cls, res):
+        try:
+            res.raise_for_status()
+            data = {f: getattr(res, f) for f in cls.success_keys}
+            try:
+                data['json'] = res.json()
+            except Exception as err:
+                print(err)
+            return data
+        except requests.exceptions.HTTPError as her:
+            return {f: getattr(her.response, f) for f in cls.failure_keys}
 
     @classmethod
     def request_type(cls, name: str):
@@ -276,32 +318,64 @@ class RestHelper(object):
             # probably malformed netloc, don't cache just in case.
             return False
 
-    def __init__(self, res: ResourceDefinition = None):
+    def __init__(self):
         pass
 
-    def request(self, config):
+    @check_required
+    def request(
+        self,
+        method=None,
+        url=None,
+        headers=None,
+        token=None,
+        basic_auth=None,
+        query_params=None,
+        json_body=None,
+        form_body=None,
+        allow_redirects=False,
+        **config
+    ):
         # we can template the url with other config elements
-        url = config.get('url').format(**config)
-        method = config.get('method').upper()
-        fn = self.rest_calls[method]
-        auth = config.get('basic_auth')
-        if auth:
-            auth = HTTPBasicAuth(auth['user'], auth['password'])
-        token = config.get('token', {})
-        if token:
-            token = {'Authorization': f'access_token {token}'}
-        headers = config.get('headers', {})
+        url = url.format(**config)
+        if not self.resolve(url):
+            raise RuntimeError(f'DNS resolution failed for {url}')
+        fn = self.rest_calls[method.upper()]
+        auth = HTTPBasicAuth(basic_auth['user'], basic_auth['password']) if basic_auth else None
+        token = {'Authorization': f'access_token {token}'} if token else {}
+        headers = headers or {}
         headers = {**token, **headers}  # merge in token if we have one
         request_kwargs = {
+            'allow_redirects': allow_redirects,
             'auth': auth,
             'headers': headers,
-            'params': config.get('query_params'),
-            'json': config.get('json_body'),
-            'data': config.get('form_body'),
+            'params': query_params,
+            'json': json_body,
+            'data': form_body,
             'verify': False
         }
-        if not config.get('mock_request', False):
-            return fn(
-                url,
-                **request_kwargs
-            )
+        res = fn(
+            url,
+            **request_kwargs
+        )
+        return self.response_to_dict(res)
+
+
+class JSHelper(object):
+
+    def __init__(self, definition: ResourceDefinition):
+        self._function = quickjs.Function(definition.entrypoint, definition.script)
+        self._prepare_arguments = self.__make_argument_parser(definition.arguments)
+
+    def __make_argument_parser(self, args: List[str]):
+        # TODO make type aware
+        def _fn(input: Dict[str, Any]):
+            return [input.get(i) for i in args]
+        return _fn
+
+    def calculate(self, input: Dict) -> Any:
+        args = self._prepare_arguments(input)
+        try:
+            res = self._function(*args)
+            return res
+        except Exception as err:
+            raise TransformationError(err)
