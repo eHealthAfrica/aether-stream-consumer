@@ -26,7 +26,7 @@ import pydoc
 import quickjs
 import requests
 from requests.auth import HTTPBasicAuth
-from typing import (Any, Callable, Dict, List, Union, TYPE_CHECKING)  # noqa
+from typing import (Any, Callable, Dict, List, Tuple, Union, TYPE_CHECKING)  # noqa
 from urllib.parse import urlparse
 from zeebe_grpc import (
     gateway_pb2,
@@ -34,6 +34,7 @@ from zeebe_grpc import (
 )
 import dns.resolver
 
+from aet.jsonpath import CachedParser
 from aet.resource import ResourceDefinition
 
 # if TYPE_CHECKING:
@@ -44,6 +45,82 @@ LOG = get_logger('zeebe')
 
 class TransformationError(Exception):
     pass
+
+
+@dataclass
+class Transition:
+    input_map: Dict
+    output_map: Dict
+    pass_condition: str = None
+    fail_condition: str = None
+
+    @staticmethod
+    def handle_parser_results(matches):
+        if matches:
+            if len(matches) > 1:
+                return [i.value for i in matches]
+            else:
+                return [i.value for i in matches][0]
+
+    @staticmethod
+    def apply_map(map: Dict, context: Dict) -> Dict:
+        _mapped = {
+            k: Transition.handle_parser_results(
+                CachedParser.find(v, context)) for
+            k, v in map.items()
+        }
+        # filter out nones so key presence doesn't cause overwrite on merge
+        return {k: v for k, v in _mapped.items() if v is not None}
+
+    @staticmethod
+    def apply_merge_dicts(_map: Dict, a: Dict, b: dict):
+        # source from A, then update with non None contents of B
+        return {
+            **Transition.apply_map(
+                _map, a),
+            **Transition.apply_map(
+                _map, b)
+        }
+
+    def prepare_input(self, input_context: Dict, transformation: ResourceDefinition) -> Dict:
+        return Transition.apply_merge_dicts(
+            self.input_map,                      # source
+            {'transformation': transformation},  # overrides
+            input_context
+        )
+
+    def prepare_output(self, result: Dict, transformation: ResourceDefinition) -> Dict:
+        return Transition.apply_merge_dicts(
+            self.output_map,                     # source
+            {'transformation': transformation},  # overrides
+            result
+        )
+
+    def check_failure(self, output: Dict):
+        path, result = self.get_evaluation_condition()
+        if not path:
+            return
+        # raises Error on failure
+        self.evaluate_condition(path, result, output)
+
+    def evaluate_condition(self, path, expected, data):
+        res = Transition.handle_parser_results(
+            CachedParser.find(path, data))
+        if res is expected:
+            return
+        raw_path = path.split('.`')[0]
+        checksum = Transition.handle_parser_results(
+            CachedParser.find(raw_path, data))
+        raise ValueError(f'Expected {checksum} at path {raw_path} to evaluate '
+                         f'to {expected} from expression {path}, got {res}')
+
+    def get_evaluation_condition(self) -> Tuple[str, bool]:
+        if self.pass_condition:
+            return (self.pass_condition, True)
+        elif self.fail_condition:
+            return (self.fail_condition, False)
+        # if no conditions, this stage always passes
+        return (None, True)
 
 
 @dataclass
@@ -192,51 +269,6 @@ class ZeebeJob(Event):
 # TODO implement for Kafka
 class KafkaMessage(Event):
     pass
-
-
-class PipelineContext(object):
-
-    def __init__(
-        self,
-        event: Event = None,
-        zeebe: ZeebeConnection = None,
-        kafka=None  # Kafka instance (TODO add type)
-    ):
-        self.zeebe = zeebe
-        self.kafka = kafka
-        self.data: OrderedDict[str, Dict] = {}
-        if isinstance(event, ZeebeJob):
-            self.register_result('source', event.variables)
-        self.source_event = event
-
-    def register_result(self, _id, result):
-        self.data[_id] = result
-
-    def last(self) -> Dict:
-        return self.data.get(list(self.data.keys())[-1])
-
-    def to_json(self):
-        return json.dumps(self.data)
-
-
-class PipelineSet(object):
-    def __init__(
-        self,
-        context: PipelineContext = None,
-        stages=None  # List[Transformation] = None
-    ):
-        self.context = context
-        self.stages = stages
-
-    def run(self, stop_on_error=True):
-        for stage in self.stages:
-            try:
-                stage_id = stage.id  # TODO see if ID format makes sense for this. Can use name?
-                # can also make method...
-                result = stage.run(self.context)
-                self.context.register_result(stage_id, result)
-            except TransformationError as ter:
-                raise ter
 
 
 def check_required(f):
@@ -422,3 +454,48 @@ class JSHelper(object):
             return res
         except Exception as err:
             raise TransformationError(err)
+
+
+class PipelineContext(object):
+
+    def __init__(
+        self,
+        event: Event = None,
+        zeebe: ZeebeConnection = None,
+        kafka=None  # Kafka instance (TODO add type)
+    ):
+        self.zeebe = zeebe
+        self.kafka = kafka
+        self.data: OrderedDict[str, Dict] = {}
+        if isinstance(event, ZeebeJob):
+            self.register_result('source', event.variables)
+        self.source_event = event
+
+    def register_result(self, _id, result):
+        self.data[_id] = result
+
+    def last(self) -> Dict:
+        return self.data.get(list(self.data.keys())[-1])
+
+    def to_json(self):
+        return json.dumps(self.data)
+
+
+class PipelineSet(object):
+    def __init__(
+        self,
+        context: PipelineContext = None,
+        stages=None  # List[Transformation] = None
+    ):
+        self.context = context
+        self.stages = stages
+
+    def run(self, stop_on_error=True):
+        for stage in self.stages:
+            try:
+                stage_id = stage.id  # TODO see if ID format makes sense for this. Can use name?
+                # can also make method...
+                result = stage.run(self.context)
+                self.context.register_result(stage_id, result)
+            except TransformationError as ter:
+                raise ter

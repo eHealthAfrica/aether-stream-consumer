@@ -46,19 +46,22 @@ PIPELINE = {
 }
 
 BASE_TRANSFORMATION = {
-    'id': 'echo',
-    'name': 'echo',
-    'input_map': {'ref': '$.ref'},
+    'id': 'test',
+    'name': 'something'
+}
+
+BASE_TRANSITION = {
+    'input_map': {'ref': '$.source.ref'},
     'output_map': {'ref': '$.ref'}
 }
 
-BASE_TRANSFORMATION_PASS = dict(BASE_TRANSFORMATION)
-BASE_TRANSFORMATION_PASS.update({
+BASE_TRANSITION_PASS = dict(BASE_TRANSITION)
+BASE_TRANSITION_PASS.update({
     'pass_condition': '$.ref.`match(200, null)`'
 })
 
-BASE_TRANSFORMATION_FAIL = dict(BASE_TRANSFORMATION)
-BASE_TRANSFORMATION_FAIL.update({
+BASE_TRANSITION_FAIL = dict(BASE_TRANSITION)
+BASE_TRANSITION_FAIL.update({
     'fail_condition': '$.ref.`notmatch(200, null)`'
 })
 
@@ -69,8 +72,13 @@ XF_ZEEBE_SPAWN = {
     'spawn_mode': 'single',  # or multiple
     'iterable_source': '$.source.all_messages',
     'iterable_dest': 'message',
-    'pass_condition': '$.source.status.`match(200, null)`',
-    'input_map': {'ref': '$.source.ref'}
+    # 'pass_condition': '$.source.status.`match(200, null)`',
+    # 'input_map': {'ref': '$.source.ref'}
+}
+
+REST_TRANSFORMATION = {
+    'id': 'echo',
+    'name': 'echo',
 }
 
 ZEEBE_JOB = {
@@ -79,6 +87,10 @@ ZEEBE_JOB = {
     'zeebe_instance': 'default',
     'zeebe_subscription': 'default',
     'pipeline': 'default'
+}
+
+PIPELINE_SIMPLE = {
+    'stages': []
 }
 
 ZEEBE_SINK = {}

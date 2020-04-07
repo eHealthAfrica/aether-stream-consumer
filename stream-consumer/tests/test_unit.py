@@ -28,39 +28,32 @@ from app.helpers import TransformationError
 
 from aet.resource import ResourceDefinition
 
-# Test Suite contains both unit and integration tests
-# Unit tests can be run on their own from the root directory
-# enter the bash environment for the version of python you want to test
-# for example for python 3
-# `docker-compose run consumer-sdk-test bash`
-# then start the unit tests with
-# `pytest -m unit`
-# to run integration tests / all tests run the test_all.sh script from the /tests directory.
-
 
 @pytest.mark.unit
-def test__Transformation_basic():
-    trans = artifacts.Transformation('_id', examples.BASE_TRANSFORMATION_PASS)
+def test__Transformation_basic(BaseTransition):
+    trans = artifacts.Transformation('_id', examples.BASE_TRANSFORMATION)
     context = helpers.PipelineContext()
     context.register_result('source', {'ref': 200})
-    assert(trans.run(context) == {'ref': 200})
+    assert(trans.run(context, helpers.Transition(**examples.BASE_TRANSITION_PASS)) == {'ref': 200})
     context.register_result('source', {'ref': 500})
     with pytest.raises(helpers.TransformationError):
-        trans.run(context)
+        trans.run(context, helpers.Transition(**examples.BASE_TRANSITION_PASS))
 
 
 @pytest.mark.unit
 def test__xf_ZeebeComplete_basic():
-    _def = dict(examples.BASE_TRANSFORMATION_PASS)
-    _def['input_map'] = {'ref': '$.source.ref'}
-    _def['pass_condition'] = '$.source.ref.`match(200, null)`'
-    trans = artifacts.ZeebeComplete('_id', _def)
+    transition = dict(examples.BASE_TRANSITION_PASS)
+    transition['input_map'] = {'ref': '$.source.ref'}
+    transition['pass_condition'] = '$.source.ref.`match(200, null)`'
+    transition = helpers.Transition(**transition)
+
+    transformation = artifacts.ZeebeComplete('_id', examples.BASE_TRANSFORMATION)
     context = helpers.PipelineContext(helpers.TestEvent())
     context.register_result('source', {'ref': 200})
-    assert(trans.run(context) == {'ref': 200})
+    assert(transformation.run(context, transition) == {'ref': 200})
     context.register_result('source', {'ref': 500})
     with pytest.raises(helpers.TransformationError):
-        trans.run(context)
+        transformation.run(context, transition)
 
 
 @pytest.mark.parametrize('q,expect', [
@@ -102,7 +95,7 @@ def test__xf_request_dns(q, expect):
         'url': 'http://localhost:5984'
     }, RuntimeError, None)
 ])
-@pytest.mark.unit
+@pytest.mark.integration
 def test__xf_request_methods(config, exception, status):
 
     def fn():
@@ -117,13 +110,10 @@ def test__xf_request_methods(config, exception, status):
         fn()
 
 
-@pytest.mark.parametrize('definition', [
+@pytest.mark.parametrize('transition', [
     {
-        'id': '_id',
-        'url': 'https://exm.eha.im/dev/kernel/entities.json',
-        'basic_auth': {'user': 'user', 'password': 'password'},
         'input_map': {
-            'url': '$.definition.url',
+            'url': '$.transformation.url',
             'headers': '$.source.headers',
             'method': '$.source.method'
         },
@@ -132,7 +122,14 @@ def test__xf_request_methods(config, exception, status):
         }
     }
 ])
-@pytest.mark.parametrize("config,exception,status,definition_override", [
+@pytest.mark.parametrize('definition', [
+    {
+        'id': '_id',
+        'url': 'https://exm.eha.im/dev/kernel/entities.json',
+        'basic_auth': {'user': 'user', 'password': 'password'}
+    }
+])
+@pytest.mark.parametrize("config,exception,status,transition_override", [
     ({
         'method': 'get',
     }, None, 302, None),
@@ -144,25 +141,26 @@ def test__xf_request_methods(config, exception, status):
     ({
         'method': None,
         'url': 'https://exm.eha.im/dev/kernel/entities.json'
-    }, TransformationError, 302, None),
+    }, TransformationError, None, None),
     ({
         'method': 'get',
         'url': 'http://localhost:5984'
-    }, TransformationError, 302, ('input_map', {
-        'url': '$.source.url',
-        'method': '$.source.method'
-    }))
+    }, TransformationError, None,
+        ('input_map', {
+            'url': '$.source.url'}))
 ])
-@pytest.mark.unit
-def test__restcall_request_methods(definition, definition_override, config, exception, status):
-    if definition_override:
-        definition[definition_override[0]] = definition_override[1]
+@pytest.mark.integration
+def test__restcall_request_methods(definition, transition_override, transition, config, exception, status):
+    if transition_override:
+
+        transition[transition_override[0]] = transition_override[1]
+    transition = helpers.Transition(**transition)
 
     def fn():
         rc = artifacts.RestCall('_id', definition)
         context = helpers.PipelineContext()
         context.register_result('source', config)
-        res = rc.run(context)
+        res = rc.run(context, transition)
         assert(res.get('status_code') == status)
 
     if exception:

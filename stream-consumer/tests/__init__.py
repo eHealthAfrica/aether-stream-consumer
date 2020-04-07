@@ -76,6 +76,13 @@ def bpmn_echo():
         yield f.read()
 
 
+@pytest.mark.unit
+@pytest.mark.integration
+@pytest.fixture(scope='session')
+def BaseTransition():
+    return helpers.Transition(**examples.BASE_TRANSITION)
+
+
 @pytest.mark.integration
 @pytest.fixture(scope='session')
 def zeebe_config():

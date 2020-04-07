@@ -39,7 +39,7 @@ from typing import (  # noqa
 from aet.exceptions import ConsumerHttpException
 from aet.job import BaseJob, JobStatus
 from aet.logger import get_logger
-from aet.jsonpath import CachedParser
+# from aet.jsonpath import CachedParser
 from aet.resource import BaseResource, lock
 
 # Aether python lib
@@ -52,6 +52,7 @@ from app.helpers import (
     RestHelper,
     TestEvent,
     TransformationError,
+    Transition,
     ZeebeJob
 )
 
@@ -93,73 +94,19 @@ class Transformation(BaseResource):
     name = '__transformation'  # should not be directly created...
     jobs_path = None
 
-    @staticmethod
-    def handle_parser_results(matches):
-        if matches:
-            if len(matches) > 1:
-                return [i.value for i in matches]
-            else:
-                return [i.value for i in matches][0]
-
-    @staticmethod
-    def apply_map(map: Dict, context: Dict) -> Dict:
-        return {
-            k: Transformation.handle_parser_results(
-                CachedParser.find(v, context)) for
-            k, v in map.items()
-        }
-
-    def _get_local_context(self, input_context: Dict) -> Dict:
-        return Transformation.apply_map(
-            self.definition.input_map, input_context)
-
-    def _format_output(self, result: Dict) -> Dict:
-        return Transformation.apply_map(
-            self.definition.output_map, result)
-
-    def run(self, context: PipelineContext) -> Dict:
-        input_context = self._get_context_scope(context)
+    def run(self, context: PipelineContext, transition: Transition) -> Dict:
+        local_context = transition.prepare_input(context.data, self.definition)
         try:
-            local_context = self._get_local_context(input_context)
             result = self.do_work(local_context)
-            output = self._format_output(result)
-            self.check_failure(output)
+            output = transition.prepare_output(result, self.definition)
+            transition.check_failure(output)
             return output
         except Exception as err:
             raise TransformationError(err)
 
-    def _get_context_scope(self, context: PipelineContext) -> Dict:
-        return context.last()
-
     def do_work(self, local_context: Dict) -> Dict:
         # echo for basic testing
         return local_context
-
-    def check_failure(self, output: Dict):
-        path, result = self._get_evaluation_condition()
-        if not path:
-            return
-        # raises Error on failure
-        self._evaluate_condition(path, result, output)
-
-    def _evaluate_condition(self, path, expected, data):
-        res = Transformation.handle_parser_results(
-            CachedParser.find(path, data))
-        if res is expected:
-            return
-        raw_path = path.split('.`')[0]
-        checksum = Transformation.handle_parser_results(
-            CachedParser.find(raw_path, data))
-        raise ValueError(f'Expected {checksum} at path {raw_path} to evaluate '
-                         f'to {expected} from expression {path}, got {res}')
-
-    def _get_evaluation_condition(self) -> Tuple[str, bool]:
-        if hasattr(self.definition, 'pass_condition'):
-            return (self.definition.pass_condition, True)
-        elif hasattr(self.definition, 'fail_condition'):
-            return (self.definition.fail_condition, False)
-        # if no conditions, this stage always passes
-        return (None, True)
 
 
 class ZeebeComplete(Transformation):
@@ -170,13 +117,13 @@ class ZeebeComplete(Transformation):
     '''
     name = 'zeebecomplete'
 
-    def run(self, context: PipelineContext) -> Dict:
+    def run(self, context: PipelineContext, transition: Transition) -> Dict:
         input_context = context.data
         try:
             job = context.source_event
-            local_context = self._get_local_context(input_context)
+            local_context = transition.prepare_input(context.data, self.definition)
             # failure / pass based on global context
-            self.check_failure(input_context)
+            transition.check_failure(input_context)
             if isinstance(job, TestEvent):
                 return local_context
             if not isinstance(job, ZeebeJob):
@@ -211,20 +158,20 @@ class ZeebeSpawn(Transformation):
         except Exception as err:
             raise TransformationError(err)
 
-    def _get_local_context(self, input_context: Dict) -> Iterable[Dict]:
-        if self.definition.spawn_mode == 'multiple':
-            path = self.definition.iterable_source
-            out_path = self.definition.iterable_dest
-            res = Transformation.handle_parser_results(
-                CachedParser.find(path, input_context))
-            for i in res:
-                input_context[out_path] = i
-                yield Transformation.apply_map(
-                    self.definition.input_map, input_context)
-            del input_context[out_path]
-        else:
-            yield Transformation.apply_map(
-                self.definition.input_map, input_context)
+    # def _get_local_context(self, input_context: Dict) -> Iterable[Dict]:
+    #     if self.definition.spawn_mode == 'multiple':
+    #         path = self.definition.iterable_source
+    #         out_path = self.definition.iterable_dest
+    #         res = Transformation.handle_parser_results(
+    #             CachedParser.find(path, input_context))
+    #         for i in res:
+    #             input_context[out_path] = i
+    #             yield Transformation.apply_map(
+    #                 self.definition.input_map, input_context)
+    #         del input_context[out_path]
+    #     else:
+    #         yield Transformation.apply_map(
+    #             self.definition.input_map, input_context)
 
     def _handle_spawn(self, wf_name, local_context, zeebe):
         res = next(zeebe.create_instance(wf_name, variables=local_context))
@@ -239,27 +186,28 @@ class RestCall(Transformation):
 
     def _on_init(self):
         self.rest_helper = RestHelper()
-        self.definition_dict = {'definition': {k: v for k, v in self.definition.items()}}
+        # self.definition_dict = {'definition': {k: v for k, v in self.definition.items()}}
 
-    def _get_local_context(self, input_context: Dict) -> Dict:
-        _base_vars = Transformation.apply_map(
-            self.definition.input_map, self.definition_dict)
-        updates = {
-            k: v for k, v in Transformation.apply_map(
-                self.definition.input_map, input_context
-            ).items() if v is not None
-        }
-        _base_vars.update(updates)
-        return _base_vars
+    # def _get_local_context(self, input_context: Dict) -> Dict:
+    #     _base_vars = Transformation.apply_map(
+    #         self.definition.input_map, self.definition_dict)
+    #     updates = {
+    #         k: v for k, v in Transformation.apply_map(
+    #             self.definition.input_map, input_context
+    #         ).items() if v is not None
+    #     }
+    #     _base_vars.update(updates)
+    #     return _base_vars
 
-    def _format_output(self, result: Dict) -> Dict:
-        return Transformation.apply_map(
-            self.definition.output_map, result)
+    # def _format_output(self, result: Dict) -> Dict:
+    #     return Transformation.apply_map(
+    #         self.definition.output_map, result)
 
-    def _get_context_scope(self, context: PipelineContext) -> Dict:
-        return context.data
+    # def _get_context_scope(self, context: PipelineContext) -> Dict:
+    #     return context.data
 
     def do_work(self, local_context: Dict) -> Dict:
+        LOG.debug(json.dumps(local_context, indent=2))
         return self.rest_helper.request(**local_context)
 
 
