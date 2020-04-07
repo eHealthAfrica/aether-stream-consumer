@@ -95,7 +95,7 @@ def test__xf_request_dns(q, expect):
         'url': 'http://localhost:5984'
     }, RuntimeError, None)
 ])
-@pytest.mark.integration
+@pytest.mark.unit
 def test__xf_request_methods(config, exception, status):
 
     def fn():
@@ -149,7 +149,7 @@ def test__xf_request_methods(config, exception, status):
         ('input_map', {
             'url': '$.source.url'}))
 ])
-@pytest.mark.integration
+@pytest.mark.unit
 def test__restcall_request_methods(definition, transition_override, transition, config, exception, status):
     if transition_override:
 

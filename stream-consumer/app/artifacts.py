@@ -39,7 +39,7 @@ from typing import (  # noqa
 from aet.exceptions import ConsumerHttpException
 from aet.job import BaseJob, JobStatus
 from aet.logger import get_logger
-# from aet.jsonpath import CachedParser
+from aet.jsonpath import CachedParser
 from aet.resource import BaseResource, lock
 
 # Aether python lib
@@ -48,6 +48,7 @@ from aet.resource import BaseResource, lock
 from app.config import get_consumer_config, get_kafka_config
 from app.fixtures import schemas
 from app.helpers import (
+    check_required,
     PipelineContext,
     RestHelper,
     TestEvent,
@@ -137,26 +138,77 @@ class ZeebeComplete(Transformation):
 
 class ZeebeSpawn(Transformation):
     '''
-
     '''
     name = 'zeebespawn'
+    single_requirements = [
+        'workflow',
+        'mode',
+        'mapping'
+    ]
+    multiple_requirements = [
+        'workflow',
+        'mode',
+        'message_iterator',
+        'mapping'
+    ]
 
-    def run(self, context: PipelineContext) -> Dict:
+    def run(self, context: PipelineContext, transition: Transition) -> Dict:
         try:
             if context.zeebe is None:
                 raise RuntimeError('Expected pipeline context to have '
                                    ' a ZeebeConnection, found None')
-            # has all context
-            input_context = context.data
-            # failure / pass based on global context
-            self.check_failure(input_context)
-            local_context_iter = self._get_local_context(input_context)
-            wf_name = self.definition.workflow_name
-            for local_context in local_context_iter:
+            local_context = transition.prepare_input(context.data, self.definition)
+            transition.check_failure(local_context)
+            for wf_name, inner_context in self._prepare_spawns(**local_context):
                 self._handle_spawn(wf_name, local_context, context.zeebe)
             return {'success': True}
         except Exception as err:
             raise TransformationError(err)
+
+    @check_required(['single_requirements', 'multiple_requirements'])
+    def _prepare_spawns(
+        self,
+        mode=None,
+        workflow=None,
+        mapping=None,
+        message_iterator=None,
+        message_destination=None,
+        **local_context
+    ):
+        # returns (workflow, msg) generator from
+        # $.workflow
+        # $.mode = single
+        # $.mapping {$.source: dest,}
+        #  - or -
+        # $.workflow
+        # $.mode = multiple
+        # $.message_iterator = $.iterable.path
+        # $.message_destination = dest [optional]
+        # $.mapping = {$.source: dest,}
+        if mode == 'single':
+            yield Transformation.apply_map(
+                mapping, local_context)
+        elif mode == 'multiple':
+            if not message_iterator:
+                raise RuntimeError('Expected message_iterator in'
+                                   'mode `multiple` found None')
+            res = Transition.handle_parser_results(
+                CachedParser.find(message_iterator, local_context))
+            for msg in res:
+                if message_destination:
+                    yield (workflow, {
+                        **{message_destination: msg},
+                        **Transition.apply_map(
+                            mapping, local_context)
+                    })
+                else:
+                    yield (workflow, {
+                        **msg,
+                        **Transition.apply_map(
+                            mapping, local_context)
+                    })
+        else:
+            raise RuntimeError(f'Expected mode in [single, multiple], got {mode}')
 
     # def _get_local_context(self, input_context: Dict) -> Iterable[Dict]:
     #     if self.definition.spawn_mode == 'multiple':
@@ -174,8 +226,7 @@ class ZeebeSpawn(Transformation):
     #             self.definition.input_map, input_context)
 
     def _handle_spawn(self, wf_name, local_context, zeebe):
-        res = next(zeebe.create_instance(wf_name, variables=local_context))
-        LOG.info(res)
+        next(zeebe.create_instance(wf_name, variables=local_context))
         return {'success': True}
 
 
@@ -186,28 +237,8 @@ class RestCall(Transformation):
 
     def _on_init(self):
         self.rest_helper = RestHelper()
-        # self.definition_dict = {'definition': {k: v for k, v in self.definition.items()}}
-
-    # def _get_local_context(self, input_context: Dict) -> Dict:
-    #     _base_vars = Transformation.apply_map(
-    #         self.definition.input_map, self.definition_dict)
-    #     updates = {
-    #         k: v for k, v in Transformation.apply_map(
-    #             self.definition.input_map, input_context
-    #         ).items() if v is not None
-    #     }
-    #     _base_vars.update(updates)
-    #     return _base_vars
-
-    # def _format_output(self, result: Dict) -> Dict:
-    #     return Transformation.apply_map(
-    #         self.definition.output_map, result)
-
-    # def _get_context_scope(self, context: PipelineContext) -> Dict:
-    #     return context.data
 
     def do_work(self, local_context: Dict) -> Dict:
-        LOG.debug(json.dumps(local_context, indent=2))
         return self.rest_helper.request(**local_context)
 
 

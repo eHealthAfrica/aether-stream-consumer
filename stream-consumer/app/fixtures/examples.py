@@ -70,10 +70,17 @@ XF_ZEEBE_SPAWN = {
     'name': 'echo',
     'workflow_name': 'flow',
     'spawn_mode': 'single',  # or multiple
-    'iterable_source': '$.source.all_messages',
-    'iterable_dest': 'message',
+    'iterable_source': '$.all_messages',
+    # 'iterable_destination': 'message',
     # 'pass_condition': '$.source.status.`match(200, null)`',
     # 'input_map': {'ref': '$.source.ref'}
+}
+
+XF_ZEEBE_SPAWN_CONSTS = {
+    'mode': 'multiple',
+    'workflow': 'flow',
+    'mapping': {},
+    'message_iterator': '$.all_messages',
 }
 
 REST_TRANSFORMATION = {

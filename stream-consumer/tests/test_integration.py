@@ -19,7 +19,7 @@
 # under the License.
 
 from . import *  # get all test assets from test/__init__.py
-
+from app.helpers import Transition
 # Test Suite contains both unit and integration tests
 # Unit tests can be run on their own from the root directory
 # enter the bash environment for the version of python you want to test
@@ -44,21 +44,34 @@ def test__broker_connect(zeebe_connection, bad_zeebe_config):
 #     res = next(zeebe_connection.deploy_workflow('echo', bpmn_echo))
 #     LOG.critical(res)
 
+
+@pytest.mark.parametrize('transition', [
+    {
+        'input_map': {
+            'mode': '$.const.mode',
+            'workflow': '$.const.workflow',
+            'mapping': '$.const.mapping',
+            'message_iterator': '$.const.message_iterator',
+            'all_messages': '$.source.all_messages'
+        },
+    }
+])
 @pytest.mark.integration
-def test__create_work(zeebe_connection):
-    xf = artifacts.ZeebeSpawn('_id', examples.XF_ZEEBE_SPAWN)
+def test__create_work(zeebe_connection, transition):
+    _transition = Transition(**transition)
+    xf = artifacts.ZeebeSpawn('_id', examples.BASE_TRANSFORMATION)
     context = helpers.PipelineContext(
         helpers.TestEvent(),
         zeebe_connection
     )
     # single mode
-    for x in range(0, 5):
-        context.data = {'source': {'ref': x, 'status': 200}}
-        res = xf.run(context)
-        LOG.debug(res)
-    with pytest.raises(helpers.TransformationError):
-        context.data = {'source': {'ref': x, 'status': 500}}
-        res = xf.run(context)
+    # for x in range(0, 5):
+    #     context.data = {'source': {'ref': x, 'status': 200}}
+    #     res = xf.run(context)
+    #     LOG.debug(res)
+    # with pytest.raises(helpers.TransformationError):
+    #     context.data = {'source': {'ref': x, 'status': 500}}
+    #     res = xf.run(context)
     # multimode
     messages = [{'res': v} for v in range(10, 15)]
     xf.definition.input_map = {'ref': '$.message'}
@@ -66,9 +79,10 @@ def test__create_work(zeebe_connection):
     context.data = {
         'source': {
             'status': 200,
-            'all_messages': messages}
+            'all_messages': messages},
+        'const': examples.XF_ZEEBE_SPAWN_CONSTS
     }
-    res = xf.run(context)
+    res = xf.run(context, _transition)
     LOG.debug(res)
 
 

@@ -47,10 +47,27 @@ class TransformationError(Exception):
     pass
 
 
+def check_required(class_fields):
+    def inner(f):
+        def wrapper(*args, **kwargs):
+            fields = [class_fields] if not isinstance(class_fields, list) else class_fields
+            failed = []
+            for field in fields:
+                required = getattr(args[0], field)
+                missing = [i for i in required if kwargs.get(i) is None]
+                if missing:
+                    failed.append('Expected required fields, missing {missing}')
+            if len(failed) >= len(fields):
+                raise RuntimeError(f'And '.join(failed))
+            return f(*args, **kwargs)
+        return wrapper
+    return inner
+
+
 @dataclass
 class Transition:
     input_map: Dict
-    output_map: Dict
+    output_map: Dict = None
     pass_condition: str = None
     fail_condition: str = None
 
@@ -163,7 +180,10 @@ def zboperation(fn):
                     # this is important for job_iterator to work
                     # without exiting the secure_channel context
                     yield from res
-            except requests.exceptions.HTTPError as her:
+            except (
+                requests.exceptions.HTTPError,
+                requests.exceptions.ConnectionError
+            ) as her:
                 # we have to catch this and re-raise as otherwise
                 # for some reason grpc._channel doesn't exist
                 raise her
@@ -271,16 +291,6 @@ class KafkaMessage(Event):
     pass
 
 
-def check_required(f):
-    def wrapper(*args, **kwargs):
-        required = args[0].required
-        missing = [i for i in required if kwargs.get(i) is None]
-        if missing:
-            raise RuntimeError(f'Expected all required fields, missing {missing}')
-        return f(*args, **kwargs)
-    return wrapper
-
-
 class RestHelper(object):
 
     resolver: dns.resolver.Resolver = None
@@ -354,7 +364,7 @@ class RestHelper(object):
     def __init__(self):
         pass
 
-    @check_required
+    @check_required('required')
     def request(
         self,
         method=None,
