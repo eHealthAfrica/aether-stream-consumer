@@ -195,9 +195,15 @@ def test__restcall_request_methods(definition, definition_override, config, exce
     ({
         'a': 'a',
         'b': 100
+    }, None, 'a100', None  # without type checking weird things can happen
+    ),
+    ({
+        'a': 'a',
+        'b': 100
     }, TypeError, None,
         {'arguments': {'a': 'int', 'b': 'int'}}
     ),
+
 ])
 @pytest.mark.unit
 def test__xf_js_helper(definition, definition_override, config, exception, result):
@@ -214,3 +220,34 @@ def test__xf_js_helper(definition, definition_override, config, exception, resul
             fn()
     else:
         fn()
+
+
+@pytest.mark.parametrize('definition', [
+    ResourceDefinition({
+        'entrypoint': 'f',
+        'script': '''
+        function f(myData) {
+            const Parser = json2csv.Parser;
+            const fields = ['a', 'b'];
+            const opts = { fields };
+            try {
+              const parser = new Parser(opts);
+              return parser.parse(myData);
+            } catch (err) {
+              console.error(err);
+            }
+        }
+
+        ''',
+        'arguments': ['jsonBody'],
+        'libraries': ['https://cdn.jsdelivr.net/npm/json2csv@4.2.1/dist/json2csv.umd.js']
+    })
+])
+@pytest.mark.unit
+def test__xf_js_helper_remote_lib(definition):
+    input = {'jsonBody': [{'a': 1, 'b': x} for x in range(1000)]}
+    h = helpers.JSHelper(definition)
+    res = h.calculate(input)
+    import csv
+    reader = list(csv.reader(res.splitlines(), quoting=csv.QUOTE_NONNUMERIC))
+    assert(reader[1000][1] == 999)
