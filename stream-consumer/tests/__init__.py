@@ -63,7 +63,7 @@ kafka_server = "kafka-test:29099"
 # pick a random tenant for each run so we don't need to wipe ES.
 TS = str(uuid4()).replace('-', '')[:8]
 TENANT = f'TEN{TS}'
-TEST_TOPIC = 'firebase_test_topic'
+TEST_TOPIC = 'stream_consumer_test_topic'
 
 GENERATED_SAMPLES = {}
 # We don't want to initiate this more than once...

@@ -187,18 +187,23 @@ def test__restcall_request_methods(definition, definition_override, config, exce
         'arguments': ['a', 'b']
     })
 ])
-@pytest.mark.parametrize("config,exception,result", [
+@pytest.mark.parametrize("config,exception,result,definition_override", [
     ({
         'a': 1,
         'b': 100
-    }, None, 101),
+    }, None, 101, None),
     ({
         'a': 'a',
         'b': 100
-    }, TypeError, None),
+    }, TypeError, None,
+        {'arguments': {'a': 'int', 'b': 'int'}}
+    ),
 ])
 @pytest.mark.unit
-def test__xf_js_helper(definition, config, exception, result):
+def test__xf_js_helper(definition, definition_override, config, exception, result):
+    if definition_override:
+        for k in definition_override.keys():
+            definition[k] = definition_override[k]
 
     def fn():
         h = helpers.JSHelper(definition)

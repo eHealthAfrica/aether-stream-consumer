@@ -22,10 +22,11 @@ from collections import OrderedDict
 from dataclasses import dataclass
 import json
 import grpc
+import pydoc
 import quickjs
 import requests
 from requests.auth import HTTPBasicAuth
-from typing import (Any, Dict, List, TYPE_CHECKING)  # noqa
+from typing import (Any, Callable, Dict, List, Union, TYPE_CHECKING)  # noqa
 from urllib.parse import urlparse
 from zeebe_grpc import (
     gateway_pb2,
@@ -362,15 +363,51 @@ class RestHelper(object):
 
 class JSHelper(object):
 
-    def __init__(self, definition: ResourceDefinition):
-        self._function = quickjs.Function(definition.entrypoint, definition.script)
-        self._prepare_arguments = self.__make_argument_parser(definition.arguments)
+    @staticmethod
+    def get_file(url: str) -> str:
+        res = requests.get(url)
+        res.raise_for_status()
+        return res.text
 
-    def __make_argument_parser(self, args: List[str]):
-        # TODO make type aware
-        def _fn(input: Dict[str, Any]):
-            return [input.get(i) for i in args]
+    def __init__(self, definition: ResourceDefinition):
+        self._prepare_function(definition)
+        self._prepare_arguments = self._make_argument_parser(definition.arguments)
+
+    def _prepare_function(self, definition: ResourceDefinition):
+        script = definition.script
+        libs = definition.get('libraries', [])
+        for lib_url in libs:
+            _body = self.get_file(lib_url)
+            script = f'''
+                        {script}
+                        {_body}
+                        '''
+        self._function = quickjs.Function(definition.entrypoint, script)
+
+    def __type_checker(name, _type):
+        _type = pydoc.locate(_type)
+
+        def _fn(obj) -> bool:
+            if not isinstance(obj, _type):
+                raise TypeError(f'Expected {name} to be of type {_type}, Got {type(_type)}')
+            return True
         return _fn
+
+    def __make_type_checkers(self, args: Dict[str, str]) -> Dict[str, Callable]:
+        return {name: self.__type_checker(_type) for name, _type in args.items()}
+
+    def _make_argument_parser(self, args: Union[List[str], Dict[str, str]]):
+        # TODO make type aware
+        if isinstance(args, dict):
+            type_checkers = self.__make_type_checkers(args)
+
+            def _fn(input: Dict[str, Any]):
+                return [input.get(i) for i in args if type_checkers[i](input.get(i))]
+            return _fn
+        elif isinstance(args, list):
+            def _fn(input: Dict[str, Any]):
+                return [input.get(i) for i in args]
+            return _fn
 
     def calculate(self, input: Dict) -> Any:
         args = self._prepare_arguments(input)
