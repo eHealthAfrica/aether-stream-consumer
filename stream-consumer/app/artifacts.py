@@ -49,8 +49,10 @@ from app.config import get_consumer_config, get_kafka_config
 from app.fixtures import schemas
 from app.helpers import (
     check_required,
+    JSHelper,
     PipelineContext,
     RestHelper,
+    Stage,
     TestEvent,
     TransformationError,
     Transition,
@@ -160,7 +162,7 @@ class ZeebeSpawn(Transformation):
             local_context = transition.prepare_input(context.data, self.definition)
             transition.check_failure(local_context)
             for wf_name, inner_context in self._prepare_spawns(**local_context):
-                self._handle_spawn(wf_name, local_context, context.zeebe)
+                self._handle_spawn(wf_name, inner_context, context.zeebe)
             return {'success': True}
         except Exception as err:
             raise TransformationError(err)
@@ -174,20 +176,11 @@ class ZeebeSpawn(Transformation):
         message_iterator=None,
         message_destination=None,
         **local_context
-    ):
-        # returns (workflow, msg) generator from
-        # $.workflow
-        # $.mode = single
-        # $.mapping {$.source: dest,}
-        #  - or -
-        # $.workflow
-        # $.mode = multiple
-        # $.message_iterator = $.iterable.path
-        # $.message_destination = dest [optional]
-        # $.mapping = {$.source: dest,}
+    ) -> Iterable[Tuple[str, Dict]]:
+        # returns (workflow, msg) generator
         if mode == 'single':
-            yield Transformation.apply_map(
-                mapping, local_context)
+            yield (workflow, Transition.apply_map(
+                mapping, local_context))
         elif mode == 'multiple':
             if not message_iterator:
                 raise RuntimeError('Expected message_iterator in'
@@ -210,21 +203,6 @@ class ZeebeSpawn(Transformation):
         else:
             raise RuntimeError(f'Expected mode in [single, multiple], got {mode}')
 
-    # def _get_local_context(self, input_context: Dict) -> Iterable[Dict]:
-    #     if self.definition.spawn_mode == 'multiple':
-    #         path = self.definition.iterable_source
-    #         out_path = self.definition.iterable_dest
-    #         res = Transformation.handle_parser_results(
-    #             CachedParser.find(path, input_context))
-    #         for i in res:
-    #             input_context[out_path] = i
-    #             yield Transformation.apply_map(
-    #                 self.definition.input_map, input_context)
-    #         del input_context[out_path]
-    #     else:
-    #         yield Transformation.apply_map(
-    #             self.definition.input_map, input_context)
-
     def _handle_spawn(self, wf_name, local_context, zeebe):
         next(zeebe.create_instance(wf_name, variables=local_context))
         return {'success': True}
@@ -242,10 +220,41 @@ class RestCall(Transformation):
         return self.rest_helper.request(**local_context)
 
 
+class JavascriptCall(Transformation):
+    schema = schemas.PERMISSIVE
+    name = 'jscall'
+    jobs_path = None
+
+    def _on_init(self):
+        self.js_helper = JSHelper(self.definition)
+
+    def do_work(self, local_context: Dict) -> Dict:
+        LOG.debug(local_context)
+        return self.js_helper.calculate(local_context)
+
+
 class Pipeline(BaseResource):
     schema = schemas.PERMISSIVE
     name = 'pipeline'
     jobs_path = '$.pipeline'
+
+    def _execute_stage(
+        stage: Stage,
+        context: PipelineContext,
+        xf: Transformation,
+        raise_errors=True
+    ):
+        try:
+            result = xf.run(context, stage.transition)
+            context.register_result(stage.name, result)
+        except TransformationError as ter:
+            if raise_errors:
+                raise(ter)
+            else:
+                context.register_result(stage.name, str(ter))
+
+    def __make_transform_iterator(self,):
+        pass
 
 
 class Job(BaseJob):

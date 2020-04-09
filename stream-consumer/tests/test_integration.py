@@ -52,8 +52,11 @@ def test__broker_connect(zeebe_connection, bad_zeebe_config):
             'workflow': '$.const.workflow',
             'mapping': '$.const.mapping',
             'message_iterator': '$.const.message_iterator',
-            'all_messages': '$.source.all_messages'
+            'all_messages': '$.source.all_messages',
+            'status': '$.source.status',
+            'res': '$.source.res'
         },
+        'pass_condition': '$.status.`match(200, null)`'
     }
 ])
 @pytest.mark.integration
@@ -64,23 +67,42 @@ def test__create_work(zeebe_connection, transition):
         helpers.TestEvent(),
         zeebe_connection
     )
+
+    context.data = {
+        'source': {
+            'res': 0
+        },
+        'const': {
+            'mode': 'single',
+            'workflow': 'flow',
+            'mapping': {
+                'res': '$.res'
+            }
+        }
+
+    }
     # single mode
-    # for x in range(0, 5):
-    #     context.data = {'source': {'ref': x, 'status': 200}}
-    #     res = xf.run(context)
-    #     LOG.debug(res)
-    # with pytest.raises(helpers.TransformationError):
-    #     context.data = {'source': {'ref': x, 'status': 500}}
-    #     res = xf.run(context)
+    for x in range(0, 5):
+        context.data['source'] = {'res': x, 'status': 200}
+        ok = xf.run(context, _transition)
+        LOG.debug(ok)
+    with pytest.raises(helpers.TransformationError):
+        context.data['source'] = {'res': -99, 'status': 500}
+        ok = xf.run(context, _transition)
+        LOG.debug(ok)
     # multimode
-    messages = [{'res': v} for v in range(10, 15)]
-    xf.definition.input_map = {'ref': '$.message'}
-    xf.definition.spawn_mode = 'multiple'
+
     context.data = {
         'source': {
             'status': 200,
-            'all_messages': messages},
-        'const': examples.XF_ZEEBE_SPAWN_CONSTS
+            'all_messages': [{'res': v} for v in range(10, 15)]
+        },
+        'const': {
+            'mode': 'multiple',
+            'workflow': 'flow',
+            'mapping': {},
+            'message_iterator': '$.all_messages',
+        }
     }
     res = xf.run(context, _transition)
     LOG.debug(res)

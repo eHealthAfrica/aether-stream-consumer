@@ -83,6 +83,21 @@ XF_ZEEBE_SPAWN_CONSTS = {
     'message_iterator': '$.all_messages',
 }
 
+XF_JS_ADDER = {
+    'id': 'test',
+    'entrypoint': 'f',
+    'script': '''
+        function adder(a, b) {
+        return a + b;
+    }
+    function f(a, b) {
+        return adder(a, b);
+    }
+
+    ''',
+    'arguments': ['a', 'b']
+}
+
 REST_TRANSFORMATION = {
     'id': 'echo',
     'name': 'echo',
@@ -97,8 +112,29 @@ ZEEBE_JOB = {
 }
 
 PIPELINE_SIMPLE = {
+    'const': {
+        'get_method': 'get',
+        'entities_url': ''
+    },
     'stages': []
 }
 
 ZEEBE_SINK = {}
 KAFKA_SINK = {}
+
+
+REST_STAGE = {
+    'name': 'entities',
+    'transform_type': 'restcall',
+    'transform_id': None,
+    'transition': {
+        'input_map': {
+            'method': '$.consts.get_method',
+            'url': '$.consts.entities_url'
+        },
+        'output_map': {
+            'status_code': '$.status_code',
+            'messages': '$.json_body.results'
+        }
+    }
+}

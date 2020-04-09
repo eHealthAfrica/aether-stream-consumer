@@ -18,13 +18,22 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from copy import deepcopy
 import pytest
 
-from . import *  # get all test assets from test/__init__.py
+from . import *  # noqa
 from app.fixtures import examples
 from app import artifacts
-from app import helpers
-from app.helpers import TransformationError
+from app.helpers import (
+    JSHelper,
+    PipelineContext,
+    PipelineSet,
+    RestHelper,
+    Stage,
+    TestEvent,
+    TransformationError,
+    Transition
+)
 
 from aet.resource import ResourceDefinition
 
@@ -32,12 +41,12 @@ from aet.resource import ResourceDefinition
 @pytest.mark.unit
 def test__Transformation_basic(BaseTransition):
     trans = artifacts.Transformation('_id', examples.BASE_TRANSFORMATION)
-    context = helpers.PipelineContext()
+    context = PipelineContext()
     context.register_result('source', {'ref': 200})
-    assert(trans.run(context, helpers.Transition(**examples.BASE_TRANSITION_PASS)) == {'ref': 200})
+    assert(trans.run(context, Transition(**examples.BASE_TRANSITION_PASS)) == {'ref': 200})
     context.register_result('source', {'ref': 500})
-    with pytest.raises(helpers.TransformationError):
-        trans.run(context, helpers.Transition(**examples.BASE_TRANSITION_PASS))
+    with pytest.raises(TransformationError):
+        trans.run(context, Transition(**examples.BASE_TRANSITION_PASS))
 
 
 @pytest.mark.unit
@@ -45,15 +54,61 @@ def test__xf_ZeebeComplete_basic():
     transition = dict(examples.BASE_TRANSITION_PASS)
     transition['input_map'] = {'ref': '$.source.ref'}
     transition['pass_condition'] = '$.source.ref.`match(200, null)`'
-    transition = helpers.Transition(**transition)
+    transition = Transition(**transition)
 
     transformation = artifacts.ZeebeComplete('_id', examples.BASE_TRANSFORMATION)
-    context = helpers.PipelineContext(helpers.TestEvent())
+    context = PipelineContext(TestEvent())
     context.register_result('source', {'ref': 200})
     assert(transformation.run(context, transition) == {'ref': 200})
     context.register_result('source', {'ref': 500})
-    with pytest.raises(helpers.TransformationError):
+    with pytest.raises(TransformationError):
         transformation.run(context, transition)
+
+
+@pytest.mark.unit
+def test__stage_simple():
+    transition = {
+        'input_map': {'res': '$.source.res'},
+        'output_map': {'res': '$.res'}
+    }
+
+    def _getter(*args, **kwargs):
+        return artifacts.Transformation('_id', examples.BASE_TRANSFORMATION)
+
+    context = PipelineContext()
+    context.register_result('source', {'res': 1})
+    stage = Stage(
+        'test', '__transformation', '_id', Transition(**transition), _getter)
+    res = stage.run(context)
+    assert(res['res'] == 1)
+
+
+@pytest.mark.unit
+def test__pipelineset_simple():
+
+    def _getter(*args, **kwargs):
+        return artifacts.JavascriptCall('_id', examples.XF_JS_ADDER)
+
+    context = PipelineContext()
+    context.register_result('source', {'one': 1})
+
+    transition = {
+        'input_map': {
+            'a': '$.source.one',
+            'b': '$.source.one'
+        },
+        'output_map': {'result': '$.result'}
+    }
+    stages = []
+    for x in range(1, 10):
+        name = f'stage{x}'
+        stage = Stage(
+            name, 'jscall', 'adder', Transition(**deepcopy(transition)), _getter)
+        transition['input_map']['a'] = f'$.{name}.result'
+        stages.append(stage)
+    pipeline = PipelineSet(stages)
+    res = pipeline.run(context)
+    assert(res.data['stage9'] == {'result': 10})
 
 
 @pytest.mark.parametrize('q,expect', [
@@ -65,7 +120,7 @@ def test__xf_ZeebeComplete_basic():
 ])
 @pytest.mark.unit
 def test__xf_request_dns(q, expect):
-    assert(helpers.RestHelper.resolve(q) is expect)
+    assert(RestHelper.resolve(q) is expect)
 
 
 @pytest.mark.parametrize("config,exception,status", [
@@ -99,7 +154,7 @@ def test__xf_request_dns(q, expect):
 def test__xf_request_methods(config, exception, status):
 
     def fn():
-        rh = helpers.RestHelper()
+        rh = RestHelper()
         res = rh.request(**config)
         assert(res.get('status_code') == status)
 
@@ -154,11 +209,11 @@ def test__restcall_request_methods(definition, transition_override, transition, 
     if transition_override:
 
         transition[transition_override[0]] = transition_override[1]
-    transition = helpers.Transition(**transition)
+    transition = Transition(**transition)
 
     def fn():
         rc = artifacts.RestCall('_id', definition)
-        context = helpers.PipelineContext()
+        context = PipelineContext()
         context.register_result('source', config)
         res = rc.run(context, transition)
         assert(res.get('status_code') == status)
@@ -170,21 +225,6 @@ def test__restcall_request_methods(definition, transition_override, transition, 
         fn()
 
 
-@pytest.mark.parametrize('definition', [
-    ResourceDefinition({
-        'entrypoint': 'f',
-        'script': '''
-            function adder(a, b) {
-            return a + b;
-        }
-        function f(a, b) {
-            return adder(a, b);
-        }
-
-        ''',
-        'arguments': ['a', 'b']
-    })
-])
 @pytest.mark.parametrize("config,exception,result,definition_override", [
     ({
         'a': 1,
@@ -204,13 +244,14 @@ def test__restcall_request_methods(definition, transition_override, transition, 
 
 ])
 @pytest.mark.unit
-def test__xf_js_helper(definition, definition_override, config, exception, result):
+def test__xf_js_helper(definition_override, config, exception, result):
+    definition = ResourceDefinition(**examples.XF_JS_ADDER)
     if definition_override:
         for k in definition_override.keys():
             definition[k] = definition_override[k]
 
     def fn():
-        h = helpers.JSHelper(definition)
+        h = JSHelper(definition)
         res = h.calculate(config)
         assert(res == result)
     if exception:
@@ -221,30 +262,12 @@ def test__xf_js_helper(definition, definition_override, config, exception, resul
 
 
 @pytest.mark.parametrize('definition', [
-    ResourceDefinition({
-        'entrypoint': 'f',
-        'script': '''
-        function f(myData) {
-            const Parser = json2csv.Parser;
-            const fields = ['a', 'b'];
-            const opts = { fields };
-            try {
-              const parser = new Parser(opts);
-              return parser.parse(myData);
-            } catch (err) {
-              console.error(err);
-            }
-        }
-
-        ''',
-        'arguments': ['jsonBody'],
-        'libraries': ['https://cdn.jsdelivr.net/npm/json2csv@4.2.1/dist/json2csv.umd.js']
-    })
+    ResourceDefinition(examples.XF_JS_CSV_PARSER)
 ])
 @pytest.mark.unit
 def test__xf_js_helper_remote_lib(definition):
     input = {'jsonBody': [{'a': 1, 'b': x} for x in range(1000)]}
-    h = helpers.JSHelper(definition)
+    h = JSHelper(definition)
     res = h.calculate(input)
     import csv
     reader = list(csv.reader(res.splitlines(), quoting=csv.QUOTE_NONNUMERIC))

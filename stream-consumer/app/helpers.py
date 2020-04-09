@@ -461,7 +461,7 @@ class JSHelper(object):
         args = self._prepare_arguments(input)
         try:
             res = self._function(*args)
-            return res
+            return {'result': res}
         except Exception as err:
             raise TransformationError(err)
 
@@ -491,21 +491,47 @@ class PipelineContext(object):
         return json.dumps(self.data)
 
 
+@dataclass
+class Stage:
+    name: str
+    transform_type: str
+    transform_id: str
+    transition: Transition
+    __transform_getter: Callable = None
+
+    def run(self, context: PipelineContext):
+        return self.__get_transformation().run(context, self.transition)
+
+    def __get_transformation(self):  # -> Transformation:  # circular reference...
+        # having a getter here helps make testing more easy to implement.
+        return self.__transform_getter(self.transform_type, self.transform_id)
+
+
 class PipelineSet(object):
     def __init__(
         self,
-        context: PipelineContext = None,
-        stages=None  # List[Transformation] = None
+        stages: List[Stage] = None,
     ):
-        self.context = context
         self.stages = stages
 
-    def run(self, stop_on_error=True):
+    def _execute_stage(
+        self,
+        stage: Stage,
+        context: PipelineContext,
+        raise_errors=True
+    ):
+        try:
+            LOG.debug(f'{stage.name} Context : {json.dumps(context.data)}')
+            result = stage.run(context)
+            LOG.debug(f'{stage.name} Result : {json.dumps(result)}')
+            context.register_result(stage.name, result)
+        except TransformationError as ter:
+            if raise_errors:
+                raise(ter)
+            else:
+                context.register_result(stage.name, {'error': str(ter)})
+
+    def run(self, context, raise_errors=True):
         for stage in self.stages:
-            try:
-                stage_id = stage.id  # TODO see if ID format makes sense for this. Can use name?
-                # can also make method...
-                result = stage.run(self.context)
-                self.context.register_result(stage_id, result)
-            except TransformationError as ter:
-                raise ter
+            self._execute_stage(stage, context, raise_errors)
+        return context
