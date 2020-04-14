@@ -40,7 +40,7 @@ from aet.resource import ResourceDefinition
 
 @pytest.mark.unit
 def test__Transformation_basic(BaseTransition):
-    trans = artifacts.Transformation('_id', examples.BASE_TRANSFORMATION)
+    trans = artifacts.Transformation('_id', examples.BASE_TRANSFORMATION, None)
     context = PipelineContext()
     context.register_result('source', {'ref': 200})
     assert(trans.run(context, Transition(**examples.BASE_TRANSITION_PASS)) == {'ref': 200})
@@ -56,7 +56,7 @@ def test__xf_ZeebeComplete_basic():
     transition['pass_condition'] = '$.source.ref.`match(200, null)`'
     transition = Transition(**transition)
 
-    transformation = artifacts.ZeebeComplete('_id', examples.BASE_TRANSFORMATION)
+    transformation = artifacts.ZeebeComplete('_id', examples.BASE_TRANSFORMATION, None)
     context = PipelineContext(TestEvent())
     context.register_result('source', {'ref': 200})
     assert(transformation.run(context, transition) == {'ref': 200})
@@ -73,7 +73,7 @@ def test__stage_simple():
     }
 
     def _getter(*args, **kwargs):
-        return artifacts.Transformation('_id', examples.BASE_TRANSFORMATION)
+        return artifacts.Transformation('_id', examples.BASE_TRANSFORMATION, None)
 
     context = PipelineContext()
     context.register_result('source', {'res': 1})
@@ -87,7 +87,7 @@ def test__stage_simple():
 def test__pipelineset_simple():
 
     def _getter(*args, **kwargs):
-        return artifacts.JavascriptCall('_id', examples.XF_JS_ADDER)
+        return artifacts.JavascriptCall('_id', examples.XF_JS_ADDER, None)
 
     context = PipelineContext()
     context.register_result('source', {'one': 1})
@@ -212,7 +212,7 @@ def test__restcall_request_methods(definition, transition_override, transition, 
     transition = Transition(**transition)
 
     def fn():
-        rc = artifacts.RestCall('_id', definition)
+        rc = artifacts.RestCall('_id', definition, None)
         context = PipelineContext()
         context.register_result('source', config)
         res = rc.run(context, transition)
@@ -253,7 +253,7 @@ def test__xf_js_helper(definition_override, config, exception, result):
     def fn():
         h = JSHelper(definition)
         res = h.calculate(config)
-        assert(res == result)
+        assert(res['result'] == result)
     if exception:
         with pytest.raises(exception):
             fn()
@@ -270,5 +270,5 @@ def test__xf_js_helper_remote_lib(definition):
     h = JSHelper(definition)
     res = h.calculate(input)
     import csv
-    reader = list(csv.reader(res.splitlines(), quoting=csv.QUOTE_NONNUMERIC))
+    reader = list(csv.reader(res['result'].splitlines(), quoting=csv.QUOTE_NONNUMERIC))
     assert(reader[1000][1] == 999)

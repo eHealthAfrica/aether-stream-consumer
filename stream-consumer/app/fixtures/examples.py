@@ -98,6 +98,25 @@ XF_JS_ADDER = {
     'arguments': ['a', 'b']
 }
 
+XF_JS_CSV_PARSER = {
+    'entrypoint': 'f',
+    'script': '''
+    function f(myData) {
+        const Parser = json2csv.Parser;
+        const fields = ['a', 'b'];
+        const opts = { fields };
+        try {
+          const parser = new Parser(opts);
+          return parser.parse(myData);
+        } catch (err) {
+          console.error(err);
+        }
+    }
+    ''',
+    'arguments': ['jsonBody'],
+    'libraries': ['https://cdn.jsdelivr.net/npm/json2csv@4.2.1/dist/json2csv.umd.js']
+}
+
 REST_TRANSFORMATION = {
     'id': 'echo',
     'name': 'echo',
