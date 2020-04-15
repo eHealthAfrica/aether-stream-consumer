@@ -48,6 +48,7 @@ pytest-runner==5.2
 quickjs==1.11.0
 redis==3.4.1
 requests==2.23.0
+responses==0.10.12
 six==1.14.0
 soupsieve==2.0
 spavro==1.1.23

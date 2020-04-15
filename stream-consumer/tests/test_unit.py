@@ -20,6 +20,7 @@
 
 from copy import deepcopy
 import pytest
+import responses
 
 from . import *  # noqa
 from app.fixtures import examples
@@ -36,6 +37,13 @@ from app.helpers import (
 )
 
 from aet.resource import ResourceDefinition
+
+
+@pytest.mark.unit
+def test__TestEvent_as_dict():
+    t = TestEvent(**{'a': 1})
+    assert('a' in t.keys())
+    assert(t.get('a') == 1)
 
 
 @pytest.mark.unit
@@ -57,8 +65,9 @@ def test__xf_ZeebeComplete_basic():
     transition = Transition(**transition)
 
     transformation = artifacts.ZeebeComplete('_id', examples.BASE_TRANSFORMATION, None)
-    context = PipelineContext(TestEvent())
-    context.register_result('source', {'ref': 200})
+    context = PipelineContext(
+        TestEvent(**{'source': {'ref': 200}}))
+    # context.register_result('source', {'ref': 200})
     assert(transformation.run(context, transition) == {'ref': 200})
     context.register_result('source', {'ref': 500})
     with pytest.raises(TransformationError):
@@ -106,7 +115,7 @@ def test__pipelineset_simple():
             name, 'jscall', 'adder', Transition(**deepcopy(transition)), _getter)
         transition['input_map']['a'] = f'$.{name}.result'
         stages.append(stage)
-    pipeline = PipelineSet(stages)
+    pipeline = PipelineSet(stages=stages)
     res = pipeline.run(context)
     assert(res.data['stage9'] == {'result': 10})
 
@@ -123,6 +132,7 @@ def test__xf_request_dns(q, expect):
     assert(RestHelper.resolve(q) is expect)
 
 
+@responses.activate
 @pytest.mark.parametrize("config,exception,status", [
     ({
         'method': 'get',
@@ -152,6 +162,11 @@ def test__xf_request_dns(q, expect):
 ])
 @pytest.mark.unit
 def test__xf_request_methods(config, exception, status):
+    url = config.get('url')
+    method_str = config.get('method')
+    method = responses.GET if method_str == 'get' else responses.POST
+    body = Exception() if exception else None
+    responses.add(method, url, body=body, status=status)
 
     def fn():
         rh = RestHelper()
@@ -165,6 +180,7 @@ def test__xf_request_methods(config, exception, status):
         fn()
 
 
+@responses.activate
 @pytest.mark.parametrize('transition', [
     {
         'input_map': {
@@ -206,6 +222,12 @@ def test__xf_request_methods(config, exception, status):
 ])
 @pytest.mark.unit
 def test__restcall_request_methods(definition, transition_override, transition, config, exception, status):
+    url = definition.get('url')
+    method_str = config.get('method')
+    method = responses.GET if method_str == 'get' else None
+    body = Exception() if exception else '"{}"'
+    responses.add(method, url, body=body, status=status)
+
     if transition_override:
 
         transition[transition_override[0]] = transition_override[1]

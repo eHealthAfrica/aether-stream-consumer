@@ -20,6 +20,7 @@
 
 # import fnmatch
 import json  # noqa
+from functools import partial
 from time import sleep
 from typing import (  # noqa
     Dict,
@@ -47,10 +48,13 @@ from aet.resource import BaseResource, lock
 
 from app.config import get_consumer_config, get_kafka_config
 from app.fixtures import schemas
-from app.helpers import (
+from app.helpers import (  # noqa
     check_required,
+    Event,
     JSHelper,
+    KafkaMessage,
     PipelineContext,
+    PipelineSet,
     RestHelper,
     Stage,
     TestEvent,
@@ -59,7 +63,6 @@ from app.helpers import (
     ZeebeJob
 )
 
-# from app import helpers
 
 LOG = get_logger('artifacts')
 CONSUMER_CONFIG = get_consumer_config()
@@ -238,22 +241,28 @@ class Pipeline(BaseResource):
     name = 'pipeline'
     jobs_path = '$.pipeline'
 
-    def _execute_stage(
-        stage: Stage,
-        context: PipelineContext,
-        xf: Transformation,
-        raise_errors=True
-    ):
-        try:
-            result = xf.run(context, stage.transition)
-            context.register_result(stage.name, result)
-        except TransformationError as ter:
-            if raise_errors:
-                raise(ter)
-            else:
-                context.register_result(stage.name, str(ter))
+    def _on_init(self):
+        self.pipeline_set = PipelineSet(
+            definition=self.definition,
+            getter=partial(
+                self.context.get, tenant=self.tenant)
+        )
 
-    def __make_transform_iterator(self,):
+    def _read_events(self) -> Iterable[Event]:
+        pass
+
+    def _get_zeebe_jobs(self) -> Iterable[ZeebeJob]:
+        pass
+
+    def _get_kafka_messages(self) -> Iterable[KafkaMessage]:
+        pass
+
+    def _handle_events(self, events: Iterable[Event]):
+        pass
+
+    # public!
+    def test(self, *args, **kwargs):
+        # message = kwargs.get('json_body')
         pass
 
 

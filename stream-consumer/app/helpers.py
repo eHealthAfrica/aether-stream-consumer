@@ -264,9 +264,11 @@ class Event(object):
         pass
 
 
-class TestEvent(Event):
+class TestEvent(Event, dict):
     # used for interactive testing
-    pass
+    def __init__(self, *args, **kwargs):
+        LOG.debug([args, kwargs])
+        dict.__init__(self, *args, **kwargs)
 
 
 class ZeebeJob(Event):
@@ -329,8 +331,8 @@ class RestHelper(object):
             data = {f: getattr(res, f) for f in cls.success_keys}
             try:
                 data['json'] = res.json()
-            except Exception as err:
-                print(err)
+            except Exception:
+                pass
             return data
         except requests.exceptions.HTTPError as her:
             return {f: getattr(her.response, f) for f in cls.failure_keys}
@@ -479,6 +481,9 @@ class PipelineContext(object):
         self.data: OrderedDict[str, Dict] = {}
         if isinstance(event, ZeebeJob):
             self.register_result('source', event.variables)
+        elif isinstance(event, TestEvent):
+            for k in event.keys():
+                self.register_result(k, event.get(k))
         self.source_event = event
 
     def register_result(self, _id, result):
@@ -510,9 +515,31 @@ class Stage:
 class PipelineSet(object):
     def __init__(
         self,
-        stages: List[Stage] = None,
+        definition: Dict = None,
+        getter: Callable = None,
+        stages: List[Stage] = None
     ):
-        self.stages = stages
+        if stages:
+            self.stages = stages
+        else:
+            if not all([definition, getter]):
+                raise ValueError('PipelineSet requires definition and getter')
+            self.stages = self._prepare_stages(definition, getter)
+
+    def handle_event(event: Event):
+        pass
+
+    def _prepare_stages(self, definition, getter: Callable):
+        return [
+            Stage(
+                st['name'],
+                st['type'],
+                st['id'],
+                Transition(st['transition']),
+                getter
+            )
+            for st in definition.stages
+        ]
 
     def _execute_stage(
         self,
@@ -531,7 +558,7 @@ class PipelineSet(object):
             else:
                 context.register_result(stage.name, {'error': str(ter)})
 
-    def run(self, context, raise_errors=True):
+    def run(self, context: PipelineContext, raise_errors=True):
         for stage in self.stages:
             self._execute_stage(stage, context, raise_errors)
         return context

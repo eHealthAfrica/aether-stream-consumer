@@ -38,9 +38,18 @@ ZEEBE_SUBSCRIPTION = {
 
 }
 
-PIPELINE = {
+PIPELINE_ZEEBE = {
     'id': 'default',
     'name': 'something',
+    'zeebe_subscription': {},
+    'steps': [
+    ]
+}
+
+PIPELINE_KAFKA = {
+    'id': 'default',
+    'name': 'something',
+    'kafka_subscription': {},
     'steps': [
     ]
 }
@@ -135,7 +144,12 @@ PIPELINE_SIMPLE = {
         'get_method': 'get',
         'entities_url': ''
     },
-    'stages': []
+    'stages': [
+        {
+            'type': '',
+            'id': '',
+        },
+    ]
 }
 
 ZEEBE_SINK = {}

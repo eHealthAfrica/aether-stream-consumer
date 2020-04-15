@@ -21,3 +21,4 @@ flake8
 mock
 pytest
 pytest-runner
+responses
