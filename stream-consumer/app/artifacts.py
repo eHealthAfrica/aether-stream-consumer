@@ -121,13 +121,10 @@ class Transformation(BaseResource):
     # public!
     def test(self, *args, **kwargs):
         try:
-            LOG.debug(f'test {self.name}:{self.id} has keys: {kwargs.keys()}')
+            # LOG.debug(f'test {self.name}:{self.id} has keys: {kwargs.keys()}')
             message = kwargs.get('json_body')
             result = self.do_work(message)
-            try:
-                return json.dumps(result)
-            except (TypeError):
-                return result
+            return json.dumps(result)
         except Exception as err:
             return str(err)
 
@@ -286,7 +283,7 @@ class Pipeline(BaseResource):
 
     # public!
     def test(self, *args, **kwargs):
-        LOG.debug(f'test has keys: {kwargs.keys()}')
+        LOG.debug(f'test has keys: {list(kwargs.keys())}')
         message = kwargs.get('json_body')
         context = self._make_context(TestEvent(**message))
         context = self.pipeline_set.run(context)

@@ -265,7 +265,7 @@ class Event(object):
 class TestEvent(Event, dict):
     # used for interactive testing
     def __init__(self, *args, **kwargs):
-        LOG.debug([args, kwargs])
+        # LOG.debug([args, kwargs])
         dict.__init__(self, *args, **kwargs)
 
 
@@ -331,6 +331,7 @@ class RestHelper(object):
                 data['json'] = res.json()
             except Exception:
                 pass
+            data['headers'] = {k: v for k, v in data.get('headers', {}).items()}
             return data
         except requests.exceptions.HTTPError as her:
             return {f: getattr(her.response, f) for f in cls.failure_keys}
@@ -552,9 +553,9 @@ class PipelineSet(object):
         raise_errors=True
     ):
         try:
-            LOG.debug(f'{stage.name} Context : {json.dumps(context.data, indent=2)}')
+            # LOG.debug(f'{stage.name} Context : {json.dumps(context.data, indent=2)}')
             result = stage.run(context)
-            LOG.debug(f'{stage.name} Result : {json.dumps(result, indent=2)}')
+            # LOG.debug(f'{stage.name} Result : {json.dumps(result, indent=2)}')
             context.register_result(stage.name, result)
         except TransformationError as ter:
             if raise_errors:

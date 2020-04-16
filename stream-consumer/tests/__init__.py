@@ -198,7 +198,6 @@ def loaded_instance_manager(transformation_definitions):
     _clses = artifacts.Job._resources
     man = InstanceManager(_clses)
     for _id, _type, body in transformation_definitions:
-        LOG.debug(f'adding: {json.dumps([_id, _type, TENANT, body], indent=2)}')
         man.update(_id, _type, TENANT, body)
     yield man
     man.stop()

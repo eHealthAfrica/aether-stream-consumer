@@ -60,9 +60,9 @@ def test__broker_connect(zeebe_connection, bad_zeebe_config):
     }
 ])
 @pytest.mark.integration
-def test__create_work(zeebe_connection, transition):
+def test__create_work(zeebe_connection, transition, loaded_instance_manager):
     _transition = Transition(**transition)
-    xf = artifacts.ZeebeSpawn('_id', examples.BASE_TRANSFORMATION)
+    xf = artifacts.ZeebeSpawn('_id', examples.BASE_TRANSFORMATION, loaded_instance_manager)
     context = helpers.PipelineContext(
         helpers.TestEvent(),
         zeebe_connection
