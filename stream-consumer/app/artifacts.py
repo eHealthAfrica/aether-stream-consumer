@@ -89,16 +89,20 @@ class ZeebeInstance(BaseResource):
         return True  # TODO
 
 
-class ZeebeSubscription(BaseResource):
-    schema = schemas.PERMISSIVE
-    name = 'zeebe_subscription'
-    jobs_path = '$.zeebe_subscription'
+# class ZeebeSubscription(BaseResource):
+#     schema = schemas.PERMISSIVE
+#     name = 'zeebe_subscription'
+#     jobs_path = '$.zeebe_subscription'
 
 
 class Transformation(BaseResource):
     schema = schemas.PERMISSIVE
     name = '__transformation'  # should not be directly created...
     jobs_path = None
+
+    public_actions = BaseResource.public_actions + [
+        'test_connection'
+    ]
 
     def run(self, context: PipelineContext, transition: Transition) -> Dict:
         local_context = transition.prepare_input(context.data, self.definition)
@@ -113,6 +117,13 @@ class Transformation(BaseResource):
     def do_work(self, local_context: Dict) -> Dict:
         # echo for basic testing
         return local_context
+
+    # public!
+    def test(self, *args, **kwargs):
+        LOG.debug(f'test {self.name}:{self.id} has keys: {kwargs.keys()}')
+        message = kwargs.get('json_body')
+        result = self.do_work(message)
+        return json.dumps(result)
 
 
 class ZeebeComplete(Transformation):
@@ -232,7 +243,6 @@ class JavascriptCall(Transformation):
         self.js_helper = JSHelper(self.definition)
 
     def do_work(self, local_context: Dict) -> Dict:
-        LOG.debug(local_context)
         return self.js_helper.calculate(local_context)
 
 
@@ -241,12 +251,20 @@ class Pipeline(BaseResource):
     name = 'pipeline'
     jobs_path = '$.pipeline'
 
+    # __init__(self, tenant, definition, context)
+
     def _on_init(self):
         self.pipeline_set = PipelineSet(
             definition=self.definition,
             getter=partial(
                 self.context.get, tenant=self.tenant)
         )
+
+    def _make_context(self, evt: Event):
+        if self.definition.get('const'):
+            return PipelineContext(evt, data={'const': self.definition['const']})
+        else:
+            return PipelineContext(evt)
 
     def _read_events(self) -> Iterable[Event]:
         pass
@@ -262,13 +280,24 @@ class Pipeline(BaseResource):
 
     # public!
     def test(self, *args, **kwargs):
-        # message = kwargs.get('json_body')
-        pass
+        LOG.debug(f'test has keys: {kwargs.keys()}')
+        message = kwargs.get('json_body')
+        context = self._make_context(TestEvent(**message))
+        context = self.pipeline_set.run(context)
+        return context.to_json()
 
 
 class Job(BaseJob):
     name = 'job'
-    _resources = [ZeebeInstance, ZeebeSubscription, Pipeline]
+    _resources = [
+        ZeebeInstance,
+        # ZeebeSubscription,
+        ZeebeComplete,
+        ZeebeSpawn,
+        RestCall,
+        JavascriptCall,
+        Pipeline
+    ]
     schema = schemas.PERMISSIVE
 
     public_actions = BaseJob.public_actions + [

@@ -42,6 +42,7 @@ import requests
 # )
 from aet.helpers import chunk_iterable
 from aet.logger import get_logger
+from aet.resource import InstanceManager
 # from aet.jsonpath import CachedParser
 
 from aether.python.avro import generation
@@ -162,6 +163,43 @@ def redis_client():
 #         yield None  # end of work before clean-up
 #         LOG.debug(f'deleting topic: {new_topic}')
 #         delete_topic(kadmin, new_topic)
+
+
+@pytest.mark.unit
+@pytest.mark.integration
+@pytest.fixture(scope='session')
+def transformation_definitions():
+    '''
+        zeebe
+        # zeebesubscription
+        zeebecomplete
+        zeebespawn
+        restcall
+        jscall
+        pipeline
+    '''
+    def _format(_type, b):
+        return (b['id'], _type, b)
+
+    pairs = [
+        ('jscall', examples.XF_JS_ADDER),
+        ('jscall', examples.XF_JS_CSV_PARSER),
+    ]
+
+    yield [_format(*d) for d in pairs]
+
+
+@pytest.mark.unit
+@pytest.mark.integration
+@pytest.fixture(scope='session')
+def loaded_instance_manager(transformation_definitions):
+    _clses = artifacts.Job._resources
+    man = InstanceManager(_clses)
+    for _id, _type, body in transformation_definitions:
+        LOG.debug(f'adding: {json.dumps([_id, _type, TENANT, body], indent=2)}')
+        man.update(_id, _type, TENANT, body)
+    yield man
+    man.stop()
 
 
 @pytest.mark.unit

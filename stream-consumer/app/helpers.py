@@ -37,10 +37,8 @@ import dns.resolver
 from aet.jsonpath import CachedParser
 from aet.resource import ResourceDefinition
 
-# if TYPE_CHECKING:
-#     from app.artifacts import Transformation
 from aet.logger import get_logger
-LOG = get_logger('zeebe')
+LOG = get_logger('helr')
 
 
 class TransformationError(Exception):
@@ -474,7 +472,8 @@ class PipelineContext(object):
         self,
         event: Event = None,
         zeebe: ZeebeConnection = None,
-        kafka=None  # Kafka instance (TODO add type)
+        kafka=None,  # Kafka instance (TODO add type)
+        data: Dict = None  # other data to pass (consts, etc)
     ):
         self.zeebe = zeebe
         self.kafka = kafka
@@ -484,6 +483,9 @@ class PipelineContext(object):
         elif isinstance(event, TestEvent):
             for k in event.keys():
                 self.register_result(k, event.get(k))
+        if data:
+            for k in data.keys():
+                self.register_result(k, data.get(k))
         self.source_event = event
 
     def register_result(self, _id, result):
@@ -507,9 +509,9 @@ class Stage:
     def run(self, context: PipelineContext):
         return self.__get_transformation().run(context, self.transition)
 
-    def __get_transformation(self):  # -> Transformation:  # circular reference...
+    def __get_transformation(self) -> 'Transformation':  # noqa
         # having a getter here helps make testing more easy to implement.
-        return self.__transform_getter(self.transform_type, self.transform_id)
+        return self.__transform_getter(self.transform_id, self.transform_type)
 
 
 class PipelineSet(object):
@@ -535,7 +537,7 @@ class PipelineSet(object):
                 st['name'],
                 st['type'],
                 st['id'],
-                Transition(st['transition']),
+                Transition(**st['transition']),
                 getter
             )
             for st in definition.stages
@@ -548,9 +550,9 @@ class PipelineSet(object):
         raise_errors=True
     ):
         try:
-            LOG.debug(f'{stage.name} Context : {json.dumps(context.data)}')
+            LOG.debug(f'{stage.name} Context : {json.dumps(context.data, indent=2)}')
             result = stage.run(context)
-            LOG.debug(f'{stage.name} Result : {json.dumps(result)}')
+            LOG.debug(f'{stage.name} Result : {json.dumps(result, indent=2)}')
             context.register_result(stage.name, result)
         except TransformationError as ter:
             if raise_errors:

@@ -19,9 +19,11 @@
 # under the License.
 
 from copy import deepcopy
+import json
 import pytest
 import responses
 
+from . import TENANT
 from . import *  # noqa
 from app.fixtures import examples
 from app import artifacts
@@ -72,52 +74,6 @@ def test__xf_ZeebeComplete_basic():
     context.register_result('source', {'ref': 500})
     with pytest.raises(TransformationError):
         transformation.run(context, transition)
-
-
-@pytest.mark.unit
-def test__stage_simple():
-    transition = {
-        'input_map': {'res': '$.source.res'},
-        'output_map': {'res': '$.res'}
-    }
-
-    def _getter(*args, **kwargs):
-        return artifacts.Transformation('_id', examples.BASE_TRANSFORMATION, None)
-
-    context = PipelineContext()
-    context.register_result('source', {'res': 1})
-    stage = Stage(
-        'test', '__transformation', '_id', Transition(**transition), _getter)
-    res = stage.run(context)
-    assert(res['res'] == 1)
-
-
-@pytest.mark.unit
-def test__pipelineset_simple():
-
-    def _getter(*args, **kwargs):
-        return artifacts.JavascriptCall('_id', examples.XF_JS_ADDER, None)
-
-    context = PipelineContext()
-    context.register_result('source', {'one': 1})
-
-    transition = {
-        'input_map': {
-            'a': '$.source.one',
-            'b': '$.source.one'
-        },
-        'output_map': {'result': '$.result'}
-    }
-    stages = []
-    for x in range(1, 10):
-        name = f'stage{x}'
-        stage = Stage(
-            name, 'jscall', 'adder', Transition(**deepcopy(transition)), _getter)
-        transition['input_map']['a'] = f'$.{name}.result'
-        stages.append(stage)
-    pipeline = PipelineSet(stages=stages)
-    res = pipeline.run(context)
-    assert(res.data['stage9'] == {'result': 10})
 
 
 @pytest.mark.parametrize('q,expect', [
@@ -294,3 +250,74 @@ def test__xf_js_helper_remote_lib(definition):
     import csv
     reader = list(csv.reader(res['result'].splitlines(), quoting=csv.QUOTE_NONNUMERIC))
     assert(reader[1000][1] == 999)
+
+
+@pytest.mark.unit
+def test__stage_simple():
+    transition = {
+        'input_map': {'res': '$.source.res'},
+        'output_map': {'res': '$.res'}
+    }
+
+    def _getter(*args, **kwargs):
+        return artifacts.Transformation('_id', examples.BASE_TRANSFORMATION, None)
+
+    context = PipelineContext()
+    context.register_result('source', {'res': 1})
+    stage = Stage(
+        'test', '__transformation', '_id', Transition(**transition), _getter)
+    res = stage.run(context)
+    assert(res['res'] == 1)
+
+
+@pytest.mark.parametrize('_type,_id,kwargs,result_key,result_value', [
+    ('jscall', 'adder', {'a': 1, 'b': 2}, 'result', 3),
+    ('jscall', 'adder', {'a': 101, 'b': 2}, 'result', 103),
+    ('jscall', 'parser', {'jsonBody': {'a': 1, 'b': 2}}, 'result', '''"a","b"\n1,2''')
+])
+@pytest.mark.unit
+def test__xf_remote_test(loaded_instance_manager, _type, _id, kwargs, result_key, result_value):
+    xf = loaded_instance_manager.get(_id, _type, TENANT)
+    res = json.loads(xf.test(json_body=kwargs))
+    assert(res[result_key] == result_value)
+
+
+@pytest.mark.unit
+def test__pipelineset_simple():
+
+    def _getter(*args, **kwargs):
+        return artifacts.JavascriptCall('_id', examples.XF_JS_ADDER, None)
+
+    context = PipelineContext()
+    context.register_result('source', {'one': 1})
+
+    transition = {
+        'input_map': {
+            'a': '$.source.one',
+            'b': '$.source.one'
+        },
+        'output_map': {'result': '$.result'}
+    }
+    stages = []
+    for x in range(1, 10):
+        name = f'stage{x}'
+        stage = Stage(
+            name, 'jscall', 'adder', Transition(**deepcopy(transition)), _getter)
+        transition['input_map']['a'] = f'$.{name}.result'
+        stages.append(stage)
+    pipeline = PipelineSet(stages=stages)
+    res = pipeline.run(context)
+    assert(res.data['stage9'] == {'result': 10})
+
+
+@pytest.mark.unit
+def test__Pipeline_adder(loaded_instance_manager):
+    p = artifacts.Pipeline(TENANT, examples.PIPELINE_SIMPLE, loaded_instance_manager)
+    for x in range(5):
+        a = p.test(**{
+            'json_body': {
+                'source': {'value': 100 + x}
+            }
+        })
+        data = json.loads(a)
+        assert(data['three']['result'] == 100 + x + 3)

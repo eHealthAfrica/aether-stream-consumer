@@ -86,6 +86,8 @@ XF_ZEEBE_SPAWN = {
 }
 
 XF_ZEEBE_SPAWN_CONSTS = {
+    'id': 'flow',
+    'name': 'flow',
     'mode': 'multiple',
     'workflow': 'flow',
     'mapping': {},
@@ -93,7 +95,8 @@ XF_ZEEBE_SPAWN_CONSTS = {
 }
 
 XF_JS_ADDER = {
-    'id': 'test',
+    'id': 'adder',
+    'name': 'adder',
     'entrypoint': 'f',
     'script': '''
         function adder(a, b) {
@@ -108,6 +111,8 @@ XF_JS_ADDER = {
 }
 
 XF_JS_CSV_PARSER = {
+    'id': 'parser',
+    'name': 'CSV Parser',
     'entrypoint': 'f',
     'script': '''
     function f(myData) {
@@ -139,16 +144,56 @@ ZEEBE_JOB = {
     'pipeline': 'default'
 }
 
+
+# uses Transforms Present in tests.loaded_instance_manager
 PIPELINE_SIMPLE = {
+    'id': 'simple_adder',
     'const': {
-        'get_method': 'get',
-        'entities_url': ''
+        'one': 1,
     },
     'stages': [
         {
-            'type': '',
-            'id': '',
+            'name': 'one',
+            'type': 'jscall',
+            'id': 'adder',
+            'transition': {
+                'input_map': {
+                    'a': '$.source.value',
+                    'b': '$.const.one'
+                },
+                'output_map': {
+                    'result': '$.result'
+                }
+            }
         },
+        {
+            'name': 'two',
+            'type': 'jscall',
+            'id': 'adder',
+            'transition': {
+                'input_map': {
+                    'a': '$.one.result',
+                    'b': '$.const.one'
+                },
+                'output_map': {
+                    'result': '$.result'
+                }
+            }
+        },
+        {
+            'name': 'three',
+            'type': 'jscall',
+            'id': 'adder',
+            'transition': {
+                'input_map': {
+                    'a': '$.two.result',
+                    'b': '$.const.one'
+                },
+                'output_map': {
+                    'result': '$.result'
+                }
+            }
+        }
     ]
 }
 
