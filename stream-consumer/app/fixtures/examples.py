@@ -96,7 +96,7 @@ XF_ZEEBE_SPAWN_CONSTS = {
 
 XF_JS_ADDER = {
     'id': 'adder',
-    'name': 'adder',
+    'name': 'Laid Back JS Adder',
     'entrypoint': 'f',
     'script': '''
         function adder(a, b) {
@@ -108,6 +108,22 @@ XF_JS_ADDER = {
 
     ''',
     'arguments': ['a', 'b']
+}
+
+XF_JS_TYPED_ADDER = {
+    'id': 'strictadder',
+    'name': 'Adder with Type Checking',
+    'entrypoint': 'f',
+    'script': '''
+        function adder(a, b) {
+        return a + b;
+    }
+    function f(a, b) {
+        return adder(a, b);
+    }
+
+    ''',
+    'arguments': {'a': 'int', 'b': 'int'}
 }
 
 XF_JS_CSV_PARSER = {
@@ -132,8 +148,8 @@ XF_JS_CSV_PARSER = {
 }
 
 REST_TRANSFORMATION = {
-    'id': 'echo',
-    'name': 'echo',
+    'id': 'simple',
+    'name': 'simple',
 }
 
 ZEEBE_JOB = {

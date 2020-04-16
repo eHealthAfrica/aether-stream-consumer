@@ -426,13 +426,15 @@ class JSHelper(object):
                         '''
         self._function = quickjs.Function(definition.entrypoint, script)
 
-    def __type_checker(name, _type):
+    def __type_checker(self, name, _type):
         if _type:
             _type = pydoc.locate(_type)
 
             def _fn(obj) -> bool:
                 if not isinstance(obj, _type):
-                    raise TypeError(f'Expected {name} to be of type {_type}, Got {type(_type)}')
+                    raise TypeError(
+                        f'Expected {name} to be of type "{_type.__name__}",'
+                        f' Got "{type(obj).__name__}"')
                 return True
             return _fn
         else:
@@ -442,7 +444,7 @@ class JSHelper(object):
             return _fn
 
     def __make_type_checkers(self, args: Dict[str, str]) -> Dict[str, Callable]:
-        return {name: self.__type_checker(_type) for name, _type in args.items()}
+        return {name: self.__type_checker(name, _type) for name, _type in args.items()}
 
     def _make_argument_parser(self, args: Union[List[str], Dict[str, str]]):
         # TODO make type aware

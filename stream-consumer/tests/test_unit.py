@@ -270,16 +270,64 @@ def test__stage_simple():
     assert(res['res'] == 1)
 
 
-@pytest.mark.parametrize('_type,_id,kwargs,result_key,result_value', [
-    ('jscall', 'adder', {'a': 1, 'b': 2}, 'result', 3),
-    ('jscall', 'adder', {'a': 101, 'b': 2}, 'result', 103),
-    ('jscall', 'parser', {'jsonBody': {'a': 1, 'b': 2}}, 'result', '''"a","b"\n1,2''')
+@pytest.mark.parametrize('_type,_id,kwargs,result_key,result_value,error', [
+    ('jscall', 'adder', {'a': 1, 'b': 2}, 'result', 3, None),
+    ('jscall', 'adder', {'a': 101, 'b': 2}, 'result', 103, None),
+    ('jscall', 'parser', {'jsonBody': {'a': 1, 'b': 2}}, 'result', '''"a","b"\n1,2''', None),
+    ('jscall', 'strictadder', {'a': 101, 'b': '2'},
+        'result', None, 'Expected b to be of type "int", Got "str"'),
 ])
 @pytest.mark.unit
-def test__xf_remote_test(loaded_instance_manager, _type, _id, kwargs, result_key, result_value):
+def test__xf_jscall_remote_test(
+    loaded_instance_manager,
+    _type,
+    _id,
+    kwargs,
+    result_key,
+    result_value,
+    error
+):
     xf = loaded_instance_manager.get(_id, _type, TENANT)
-    res = json.loads(xf.test(json_body=kwargs))
-    assert(res[result_key] == result_value)
+    res = xf.test(json_body=kwargs)
+    if not error:
+        res = json.loads(res)
+        assert(res[result_key] == result_value)
+    else:
+        assert(res == error)
+
+
+@responses.activate
+@pytest.mark.parametrize('_type,_id,kwargs,result_key,result_value,error', [
+    ('restcall', 'simple', {
+        'url': 'https://google.com', 'method': 'get'
+    }, 'json', {'a': 1}, None),
+    ('restcall', 'simple', {
+        'url': 'http://localhost', 'method': 'get'
+    }, 'json', {'a': 1}, 'DNS resolution failed for http://localhost'),
+])
+@pytest.mark.unit
+def test__xf_rest_remote_test(
+    loaded_instance_manager,
+    _type,
+    _id,
+    kwargs,
+    result_key,
+    result_value,
+    error
+):
+    url = kwargs.get('url')
+    method_str = kwargs.get('method')
+    method = responses.GET if method_str == 'get' else None
+    body = json.dumps(result_value)
+    responses.add(method, url, body=body, status=200)
+
+    xf = loaded_instance_manager.get(_id, _type, TENANT)
+    res = xf.test(json_body=kwargs)
+    LOG.debug(res)
+    if not error:
+        assert(res[result_key] == result_value)
+    else:
+        assert(res == error)
 
 
 @pytest.mark.unit

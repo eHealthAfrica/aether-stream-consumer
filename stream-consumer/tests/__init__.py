@@ -184,6 +184,8 @@ def transformation_definitions():
     pairs = [
         ('jscall', examples.XF_JS_ADDER),
         ('jscall', examples.XF_JS_CSV_PARSER),
+        ('jscall', examples.XF_JS_TYPED_ADDER),
+        ('restcall', examples.REST_TRANSFORMATION),
     ]
 
     yield [_format(*d) for d in pairs]

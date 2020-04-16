@@ -120,10 +120,16 @@ class Transformation(BaseResource):
 
     # public!
     def test(self, *args, **kwargs):
-        LOG.debug(f'test {self.name}:{self.id} has keys: {kwargs.keys()}')
-        message = kwargs.get('json_body')
-        result = self.do_work(message)
-        return json.dumps(result)
+        try:
+            LOG.debug(f'test {self.name}:{self.id} has keys: {kwargs.keys()}')
+            message = kwargs.get('json_body')
+            result = self.do_work(message)
+            try:
+                return json.dumps(result)
+            except (TypeError):
+                return result
+        except Exception as err:
+            return str(err)
 
 
 class ZeebeComplete(Transformation):
