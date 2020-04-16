@@ -19,13 +19,15 @@
 # under the License.
 
 
-PERMISSIVE = {
+PERMISSIVE = '''
+{
     "$schema": "http://json-schema.org/draft-07/schema",
     "$id": "http://example.com/example.json",
     "type": "object",
     "title": "The Root Schema",
     "description": "The root schema comprises the entire JSON document."
 }
+'''
 
 KAFKA_SUBSCRIPTION = '''
 {

@@ -8,8 +8,8 @@ LOG = get_logger('MAIN')
 
 class StreamConsumer(BaseConsumer):
 
-    def __init__(self, CON_CONF, KAFKA_CONF, redis_instance=None):
-        self.job_class = artifacts.ZeebeJob
+    def __init__(self, CON_CONF=None, KAFKA_CONF=None, redis_instance=None):
+        self.job_class = artifacts.Job
         super(StreamConsumer, self).__init__(
             CON_CONF,
             KAFKA_CONF,

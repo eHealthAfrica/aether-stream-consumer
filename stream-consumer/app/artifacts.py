@@ -28,6 +28,9 @@ from typing import (  # noqa
     Iterable,
     Tuple
 )
+
+from werkzeug.local import LocalProxy
+
 #     Any,
 #     Callable,
 #     List,
@@ -101,7 +104,7 @@ class Transformation(BaseResource):
     jobs_path = None
 
     public_actions = BaseResource.public_actions + [
-        'test_connection'
+        'test'
     ]
 
     def run(self, context: PipelineContext, transition: Transition) -> Dict:
@@ -119,12 +122,16 @@ class Transformation(BaseResource):
         return local_context
 
     # public!
-    def test(self, *args, **kwargs):
+    def test(self, request=None, *args, **kwargs):
         try:
-            # LOG.debug(f'test {self.name}:{self.id} has keys: {kwargs.keys()}')
-            message = kwargs.get('json_body')
+            if isinstance(request, LocalProxy):
+                message = request.get_json()
+            elif 'json_body' in kwargs:
+                message = kwargs.get('json_body')
+            else:
+                ConsumerHttpException('Test Method expects a JSON Post', 400)
             result = self.do_work(message)
-            return json.dumps(result)
+            return result
         except Exception as err:
             return str(err)
 
@@ -135,6 +142,7 @@ class ZeebeComplete(Transformation):
         Uses input_map to prepare output for job.
         Completes job
     '''
+    schema = schemas.PERMISSIVE
     name = 'zeebecomplete'
 
     def run(self, context: PipelineContext, transition: Transition) -> Dict:

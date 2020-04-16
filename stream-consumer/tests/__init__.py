@@ -70,6 +70,22 @@ GENERATED_SAMPLES = {}
 # We don't want to initiate this more than once...
 
 
+@pytest.fixture(scope='session')
+def RedisInstance():
+    password = os.environ.get('REDIS_PASSWORD')
+    r = Redis(host='redis', password=password)
+    yield r
+
+
+@pytest.mark.integration
+@pytest.fixture(scope='session')
+def StreamConsumer(RedisInstance):
+    settings = config.get_consumer_config()
+    c = consumer.StreamConsumer(settings, redis_instance=RedisInstance)
+    yield c
+    c.stop()
+
+
 @pytest.mark.integration
 @pytest.fixture(scope='session')
 def bpmn_echo():

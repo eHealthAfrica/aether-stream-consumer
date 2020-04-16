@@ -290,7 +290,6 @@ def test__xf_jscall_remote_test(
     xf = loaded_instance_manager.get(_id, _type, TENANT)
     res = xf.test(json_body=kwargs)
     if not error:
-        res = json.loads(res)
         assert(res[result_key] == result_value)
     else:
         assert(res == error)
@@ -324,7 +323,6 @@ def test__xf_rest_remote_test(
     xf = loaded_instance_manager.get(_id, _type, TENANT)
     res = xf.test(json_body=kwargs)
     if not error:
-        res = json.loads(res)
         assert(res[result_key] == result_value)
     else:
         assert(res == error)
