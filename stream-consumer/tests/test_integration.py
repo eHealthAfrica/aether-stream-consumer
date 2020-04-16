@@ -18,8 +18,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from requests.exceptions import HTTPError
+
 from . import *  # get all test assets from test/__init__.py
 from app.helpers import Transition
+
 # Test Suite contains both unit and integration tests
 # Unit tests can be run on their own from the root directory
 # enter the bash environment for the version of python you want to test
@@ -66,8 +69,9 @@ def test__api_add_resources(StreamConsumer, RequestClientT1, ep, artifact):
     assert(doc_id in res.json())
 
 
-@pytest.mark.parametrize('_id,body,result_field,result_value', [
-    ('adder', {'a': 1, 'b': 2}, 'result', 3),
+@pytest.mark.parametrize('_id,body,result_field,result_value,error', [
+    ('adder', {'a': 1, 'b': 2}, 'result', 3, None),
+    ('strictadder', {'a': 1, 'b': '2'}, 'result', 3, 400),
 ])
 @pytest.mark.integration
 def test__js_xf_test(
@@ -76,12 +80,18 @@ def test__js_xf_test(
     _id,
     body,
     result_field,
-    result_value
+    result_value,
+    error
 ):
     res = RequestClientT1.post(f'{URL}/jscall/test?id={_id}', json=body)
-    res.raise_for_status()
-    body = res.json()
-    assert(body.get(result_field) == result_value)
+    if not error:
+        res.raise_for_status()
+        body = res.json()
+        assert(body.get(result_field) == result_value)
+    else:
+        with pytest.raises(HTTPError):
+            res.raise_for_status()
+        assert(res.status_code == error)
 
 # @pytest.mark.integration
 # def test__deploy_workflow(zeebe_connection, bpmn_echo):

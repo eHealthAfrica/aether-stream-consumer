@@ -129,11 +129,11 @@ class Transformation(BaseResource):
             elif 'json_body' in kwargs:
                 message = kwargs.get('json_body')
             else:
-                ConsumerHttpException('Test Method expects a JSON Post', 400)
+                raise ConsumerHttpException('Test Method expects a JSON Post', 400)
             result = self.do_work(message)
             return result
         except Exception as err:
-            return str(err)
+            raise ConsumerHttpException(err, 400)
 
 
 class ZeebeComplete(Transformation):
