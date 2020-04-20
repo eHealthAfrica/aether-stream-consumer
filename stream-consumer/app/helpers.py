@@ -20,13 +20,22 @@
 
 from collections import OrderedDict
 from dataclasses import dataclass
+import enum
 import json
 import grpc
 import pydoc
 import quickjs
 import requests
 from requests.auth import HTTPBasicAuth
-from typing import (Any, Callable, Dict, List, Tuple, Union, TYPE_CHECKING)  # noqa
+from typing import (  # noqa
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Tuple,
+    Union
+)
 from urllib.parse import urlparse
 from zeebe_grpc import (
     gateway_pb2,
@@ -469,23 +478,31 @@ class JSHelper(object):
             raise TransformationError(err)
 
 
+class PipelineConnection(enum.Enum):
+    KAFKA = 1
+    ZEEBE = 2
+
+
 class PipelineContext(object):
 
     def __init__(
         self,
         event: Event = None,
         zeebe: ZeebeConnection = None,
-        kafka=None,  # Kafka instance (TODO add type)
+        kafka_producer=None,  # Kafka instance (TODO add type)
         data: Dict = None  # other data to pass (consts, etc)
     ):
         self.zeebe = zeebe
-        self.kafka = kafka
+        self.kafka = kafka_producer
         self.data: OrderedDict[str, Dict] = {}
         if isinstance(event, ZeebeJob):
             self.register_result('source', event.variables)
         elif isinstance(event, TestEvent):
-            for k in event.keys():
-                self.register_result(k, event.get(k))
+            self.register_result('source', {
+                k: event.get(k) for k in event.keys()
+            })
+            # for k in event.keys():
+            #     self.register_result(k, event.get(k))
         if data:
             for k in data.keys():
                 self.register_result(k, data.get(k))
@@ -515,6 +532,36 @@ class Stage:
     def __get_transformation(self) -> 'Transformation':  # noqa
         # having a getter here helps make testing more easy to implement.
         return self.__transform_getter(self.transform_id, self.transform_type)
+
+
+class PipelinePubSub(object):
+    def __init__(
+        self,
+        definition: Dict = None
+    ):
+        self.definition = definition
+        self.kafka_consumer = None
+        self.kafka_producer = None
+        self.zeebe = None
+
+    def _make_context(self, evt: Event):
+        data = {}
+        if self.definition.get('const'):
+            data = {'const': self.definition['const']}
+        return PipelineContext(
+            evt,
+            zeebe=self.zeebe,
+            kafka_producer=self.kafka_producer,
+            data=data
+        )
+
+    def get(self) -> Iterable[PipelineContext]:
+        evts: Iterable[Event] = self._get_events()
+        for evt in evts:
+            yield self._make_context(evt)
+
+    def test(self, evt: Event) -> PipelineContext:
+        return self._make_context(evt)
 
 
 class PipelineSet(object):

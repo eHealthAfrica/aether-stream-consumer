@@ -63,10 +63,11 @@ def test__start(StreamConsumer):
 def test__api_add_resources(StreamConsumer, RequestClientT1, ep, artifact):
     doc_id = artifact.get("id")
     res = RequestClientT1.post(f'{URL}/{ep}/add', json=artifact)
-    LOG.debug(res.text)
     assert(res.json() is True)
     res = RequestClientT1.get(f'{URL}/{ep}/list')
     assert(doc_id in res.json())
+    res = RequestClientT1.get(f'{URL}/{ep}/get?id={doc_id}')
+    assert(doc_id == res.json()['id'])
 
 
 @pytest.mark.parametrize('_id,body,result_field,result_value,error', [
@@ -84,6 +85,39 @@ def test__js_xf_test(
     error
 ):
     res = RequestClientT1.post(f'{URL}/jscall/test?id={_id}', json=body)
+    if not error:
+        res.raise_for_status()
+        body = res.json()
+        assert(body.get(result_field) == result_value)
+    else:
+        with pytest.raises(HTTPError):
+            res.raise_for_status()
+        assert(res.status_code == error)
+
+
+@pytest.mark.integration
+def test__pipeline_wait_for_resource_init(
+    StreamConsumer,
+    RequestClientT1
+):
+    sleep(2)
+
+
+@pytest.mark.parametrize('_id,body,result_field,result_value,error', [
+    ('add_something', {'value': 1}, 'three', {'result': 4}, None),
+    ('add_something', {'value': "1"}, 'three', {'result': 4}, 400)
+])
+@pytest.mark.integration
+def test__pipeline_adder_test(
+    StreamConsumer,
+    RequestClientT1,
+    _id,
+    body,
+    result_field,
+    result_value,
+    error
+):
+    res = RequestClientT1.post(f'{URL}/pipeline/test?id={_id}', json=body)
     if not error:
         res.raise_for_status()
         body = res.json()

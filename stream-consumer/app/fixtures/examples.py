@@ -18,6 +18,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from copy import deepcopy
+
 KAFKA_SUBSCRIPTION = {
     'id': 'sub-test',
     'name': 'Test Subscription',
@@ -38,21 +40,6 @@ ZEEBE_SUBSCRIPTION = {
 
 }
 
-PIPELINE_ZEEBE = {
-    'id': 'default',
-    'name': 'something',
-    'zeebe_subscription': {},
-    'steps': [
-    ]
-}
-
-PIPELINE_KAFKA = {
-    'id': 'default',
-    'name': 'something',
-    'kafka_subscription': {},
-    'steps': [
-    ]
-}
 
 BASE_TRANSFORMATION = {
     'id': 'test',
@@ -163,7 +150,7 @@ ZEEBE_JOB = {
 
 # uses Transforms Present in tests.loaded_instance_manager
 PIPELINE_SIMPLE = {
-    'id': 'simple_adder',
+    'id': 'add_something',
     'const': {
         'one': 1,
     },
@@ -171,7 +158,7 @@ PIPELINE_SIMPLE = {
         {
             'name': 'one',
             'type': 'jscall',
-            'id': 'adder',
+            'id': 'strictadder',
             'transition': {
                 'input_map': {
                     'a': '$.source.value',
@@ -185,7 +172,7 @@ PIPELINE_SIMPLE = {
         {
             'name': 'two',
             'type': 'jscall',
-            'id': 'adder',
+            'id': 'strictadder',
             'transition': {
                 'input_map': {
                     'a': '$.one.result',
@@ -199,7 +186,7 @@ PIPELINE_SIMPLE = {
         {
             'name': 'three',
             'type': 'jscall',
-            'id': 'adder',
+            'id': 'strictadder',
             'transition': {
                 'input_map': {
                     'a': '$.two.result',
@@ -212,6 +199,21 @@ PIPELINE_SIMPLE = {
         }
     ]
 }
+
+PIPELINE_ZEEBE = {**PIPELINE_SIMPLE, **{
+    'id': 'zeebe',
+    'name': 'something',
+    'zeebe_instance': 'default',
+    'zeebe_subscription': 'the_source'
+}}
+
+PIPELINE_KAFKA = {**PIPELINE_SIMPLE, **{
+    'id': 'kafka',
+    'name': 'something',
+    'zeebe_instance': 'default',
+    'kafka_subscription': deepcopy(KAFKA_SUBSCRIPTION)
+}}
+
 
 ZEEBE_SINK = {}
 KAFKA_SINK = {}

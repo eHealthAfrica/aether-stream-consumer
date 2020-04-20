@@ -29,17 +29,17 @@ from uuid import uuid4
 from redis import Redis
 import requests
 
-# from spavro.schema import parse
+from spavro.schema import parse
 
-# from aet.kafka_utils import (
-#     create_topic,
-#     delete_topic,
-#     get_producer,
-#     get_admin_client,
-#     # get_broker_info,
-#     # is_kafka_available,
-#     produce
-# )
+from aet.kafka_utils import (  # noqa
+    create_topic,
+    delete_topic,
+    get_producer,
+    get_admin_client,
+    # get_broker_info,
+    # is_kafka_available,
+    produce
+)
 from aet.helpers import chunk_iterable
 from aet.logger import get_logger
 from aet.resource import InstanceManager
@@ -157,28 +157,28 @@ def redis_client():
     yield r
 
 # # @pytest.mark.integration
-# @pytest.fixture(scope='session', autouse=True)
-# def create_remote_kafka_assets(request, sample_generator, *args):
-#     # @mark annotation does not work with autouse=True.
-#     if 'integration' not in request.config.invocation_params.args:
-#         LOG.debug(f'NOT creating Kafka Assets')
-#         yield None
-#     else:
-#         LOG.debug(f'Creating Kafka Assets')
-#         kafka_security = config.get_kafka_admin_config()
-#         kadmin = get_admin_client(kafka_security)
-#         new_topic = f'{TENANT}.{TEST_TOPIC}'
-#         create_topic(kadmin, new_topic)
-#         GENERATED_SAMPLES[new_topic] = []
-#         producer = get_producer(kafka_security)
-#         schema = parse(json.dumps(ANNOTATED_SCHEMA))
-#         for subset in sample_generator(max=100, chunk=10):
-#             GENERATED_SAMPLES[new_topic].extend(subset)
-#             res = produce(subset, schema, new_topic, producer)
-#             LOG.debug(res)
-#         yield None  # end of work before clean-up
-#         LOG.debug(f'deleting topic: {new_topic}')
-#         delete_topic(kadmin, new_topic)
+@pytest.fixture(scope='session', autouse=True)
+def create_remote_kafka_assets(request, sample_generator, *args):
+    # @mark annotation does not work with autouse=True.
+    if 'integration' not in request.config.invocation_params.args:
+        LOG.debug(f'NOT creating Kafka Assets')
+        yield None
+    else:
+        LOG.debug(f'Creating Kafka Assets')
+        kafka_security = config.get_kafka_admin_config()
+        kadmin = get_admin_client(kafka_security)
+        new_topic = f'{TENANT}.{TEST_TOPIC}'
+        create_topic(kadmin, new_topic)
+        GENERATED_SAMPLES[new_topic] = []
+        producer = get_producer(kafka_security)
+        schema = parse(json.dumps(ANNOTATED_SCHEMA))
+        for subset in sample_generator(max=100, chunk=10):
+            GENERATED_SAMPLES[new_topic].extend(subset)
+            res = produce(subset, schema, new_topic, producer)
+            LOG.debug(res)
+        yield None  # end of work before clean-up
+        LOG.debug(f'deleting topic: {new_topic}')
+        delete_topic(kadmin, new_topic)
 
 
 @pytest.mark.unit

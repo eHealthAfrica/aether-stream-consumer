@@ -56,6 +56,7 @@ from app.helpers import (  # noqa
     Event,
     JSHelper,
     KafkaMessage,
+    PipelinePubSub,
     PipelineContext,
     PipelineSet,
     RestHelper,
@@ -260,9 +261,11 @@ class JavascriptCall(Transformation):
 class Pipeline(BaseResource):
     schema = schemas.PERMISSIVE
     name = 'pipeline'
-    jobs_path = '$.pipeline'
+    jobs_path = None
 
-    # __init__(self, tenant, definition, context)
+    public_actions = BaseResource.public_actions + [
+        'test'
+    ]
 
     def _on_init(self):
         self.pipeline_set = PipelineSet(
@@ -270,32 +273,32 @@ class Pipeline(BaseResource):
             getter=partial(
                 self.context.get, tenant=self.tenant)
         )
+        self.pubsub = PipelinePubSub(self.definition)
+        LOG.critical(f'Prepared Pipeline {self.id}')
 
-    def _make_context(self, evt: Event):
-        if self.definition.get('const'):
-            return PipelineContext(evt, data={'const': self.definition['const']})
-        else:
-            return PipelineContext(evt)
-
-    def _read_events(self) -> Iterable[Event]:
-        pass
-
-    def _get_zeebe_jobs(self) -> Iterable[ZeebeJob]:
-        pass
-
-    def _get_kafka_messages(self) -> Iterable[KafkaMessage]:
-        pass
-
-    def _handle_events(self, events: Iterable[Event]):
-        pass
+    def run(self):
+        res = []
+        for ctx in self.pubsub.get():
+            try:
+                res.append((True, self.pipeline_set.run(ctx)))
+            except Exception as err:
+                res.append((False, err))
+        return res
 
     # public!
-    def test(self, *args, **kwargs):
-        LOG.debug(f'test has keys: {list(kwargs.keys())}')
-        message = kwargs.get('json_body')
-        context = self._make_context(TestEvent(**message))
-        context = self.pipeline_set.run(context)
-        return context.to_json()
+    def test(self, request=None, *args, **kwargs):
+        try:
+            if isinstance(request, LocalProxy):
+                message = request.get_json()
+            elif 'json_body' in kwargs:
+                message = kwargs.get('json_body')
+            else:
+                raise ConsumerHttpException('Test Method expects a JSON Post', 400)
+            context = self.pubsub.test(TestEvent(**message))
+            context = self.pipeline_set.run(context)
+            return context.data
+        except Exception as err:
+            raise ConsumerHttpException(err, 400)
 
 
 class Job(BaseJob):
