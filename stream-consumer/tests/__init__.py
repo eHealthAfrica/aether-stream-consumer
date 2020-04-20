@@ -202,6 +202,8 @@ def transformation_definitions():
         ('jscall', examples.XF_JS_CSV_PARSER),
         ('jscall', examples.XF_JS_TYPED_ADDER),
         ('restcall', examples.REST_TRANSFORMATION),
+        ('pipeline', examples.PIPELINE_SIMPLE),
+        ('pipeline', examples.PIPELINE_KAFKA)
     ]
 
     yield [_format(*d) for d in pairs]

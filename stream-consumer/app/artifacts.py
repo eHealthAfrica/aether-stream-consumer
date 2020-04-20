@@ -122,6 +122,9 @@ class Transformation(BaseResource):
         # echo for basic testing
         return local_context
 
+    def _on_change(self):
+        self._on_init()
+
     # public!
     def test(self, request=None, *args, **kwargs):
         try:
@@ -268,17 +271,25 @@ class Pipeline(BaseResource):
     ]
 
     def _on_init(self):
+        self.kafka_consumer_group = f'{self.tenant}.stream.pipeline.{self.id}'
         self.pipeline_set = PipelineSet(
             definition=self.definition,
             getter=partial(
                 self.context.get, tenant=self.tenant)
         )
-        self.pubsub = PipelinePubSub(self.definition)
+        self.pubsub = PipelinePubSub(
+            self.tenant,
+            self.kafka_consumer_group,
+            self.definition)
         LOG.critical(f'Prepared Pipeline {self.id}')
+
+    def _on_change(self):
+        self._on_init()
 
     def run(self):
         res = []
         for ctx in self.pubsub.get():
+            LOG.debug(json.dumps(ctx.data, indent=2))
             try:
                 res.append((True, self.pipeline_set.run(ctx)))
             except Exception as err:

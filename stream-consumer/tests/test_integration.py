@@ -127,6 +127,16 @@ def test__pipeline_adder_test(
             res.raise_for_status()
         assert(res.status_code == error)
 
+
+@pytest.mark.integration
+def test__pipeline_read_kafka_sub(
+    StreamConsumer,
+    loaded_instance_manager
+):
+    pl = loaded_instance_manager.get('kafka', 'pipeline', TENANT)
+    for x in range(5):
+        pl.run()
+
 # @pytest.mark.integration
 # def test__deploy_workflow(zeebe_connection, bpmn_echo):
 #     res = next(zeebe_connection.deploy_workflow('echo', bpmn_echo))

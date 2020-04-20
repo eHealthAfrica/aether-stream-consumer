@@ -45,9 +45,13 @@ import dns.resolver
 
 from aet.jsonpath import CachedParser
 from aet.resource import ResourceDefinition
-
 from aet.logger import get_logger
+from aet.kafka import KafkaConsumer, FilterConfig, MaskConfig
+
+from app.config import get_kafka_config
+
 LOG = get_logger('helr')
+KAFKA_CONFIG = get_kafka_config()
 
 
 class TransformationError(Exception):
@@ -297,7 +301,10 @@ class ZeebeJob(Event):
 
 # TODO implement for Kafka
 class KafkaMessage(Event):
-    pass
+    def __init__(self, msg):
+        self.topic = msg.topic
+        self.value = msg.value
+        self.schema = msg.schema
 
 
 class RestHelper(object):
@@ -501,8 +508,8 @@ class PipelineContext(object):
             self.register_result('source', {
                 k: event.get(k) for k in event.keys()
             })
-            # for k in event.keys():
-            #     self.register_result(k, event.get(k))
+        elif isinstance(event, KafkaMessage):
+            self.register_result('source', event.value)
         if data:
             for k in data.keys():
                 self.register_result(k, data.get(k))
@@ -537,11 +544,16 @@ class Stage:
 class PipelinePubSub(object):
     def __init__(
         self,
+        tenant: str,
+        kafka_group=None,
         definition: Dict = None
     ):
+        self.tenant = tenant
+        self.kafka_group_id = kafka_group
         self.definition = definition
         self.kafka_consumer = None
         self.kafka_producer = None
+        self.source_type = None
         self.zeebe = None
 
     def _make_context(self, evt: Event):
@@ -555,6 +567,48 @@ class PipelinePubSub(object):
             data=data
         )
 
+    def __message_getter(self):
+        if not self.source_type:
+            if 'kafka_subscription' in self.definition:
+                self.source_type = PipelineConnection.KAFKA
+                self.__source = self.__make_kafka_getter()
+
+            elif 'zeebe_subscription' in self.definition:
+                self.source_type = PipelineConnection.ZEEBE
+                self.__source = self.__make_zeebe_getter()
+
+        return self.__source
+
+    def __make_kafka_getter(self):
+        args = {k.lower(): v for k, v in KAFKA_CONFIG.copy().items()}
+        args['group.id'] = self.kafka_group_id
+        LOG.debug(args)
+        self.kafka_consumer = KafkaConsumer(**args)
+        pattern = self.definition['kafka_subscription'].get('topic_pattern', '*')
+        # only allow regex on the end of patterns
+        if pattern.endswith('*'):
+            topic = f'^{self.tenant}.{pattern}'
+        else:
+            topic = f'{self.tenant}.{pattern}'
+        self.kafka_consumer.subscribe([topic], on_assign=self._on_kafka_assign)
+
+        def _getter():
+            messages = self.kafka_consumer.poll_and_deserialize(
+                timeout=5,
+                num_messages=1)
+            for msg in messages:
+                yield KafkaMessage(msg)
+        return _getter
+
+    def __make_zeebe_getter(self):
+        pass
+
+    def _get_events(self) -> Iterable[Event]:
+        _source = self.__message_getter()
+        yield from _source()
+        # for msg in _source():
+        #     yield msg
+
     def get(self) -> Iterable[PipelineContext]:
         evts: Iterable[Event] = self._get_events()
         for evt in evts:
@@ -562,6 +616,40 @@ class PipelinePubSub(object):
 
     def test(self, evt: Event) -> PipelineContext:
         return self._make_context(evt)
+
+    # called when a subscription causes a new assignment to be given to the consumer
+    def _on_kafka_assign(self, *args, **kwargs):
+        assignment = args[1]
+        for _part in assignment:
+            self._apply_consumer_filters(_part.topic)
+
+    def _apply_consumer_filters(self, topic):
+        try:
+            opts = self.definition['kafka_subscription']['topic_options']
+            _flt = opts.get('filter_required', False)
+            if _flt:
+                _filter_options = {
+                    'check_condition_path': opts.get('filter_field_path', ''),
+                    'pass_conditions': opts.get('filter_pass_values', []),
+                    'requires_approval': _flt
+                }
+                self.kafka_consumer.set_topic_filter_config(
+                    topic,
+                    FilterConfig(**_filter_options)
+                )
+            mask_annotation = opts.get('masking_annotation', None)
+            if mask_annotation:
+                _mask_options = {
+                    'mask_query': mask_annotation,
+                    'mask_levels': opts.get('masking_levels', []),
+                    'emit_level': opts.get('masking_emit_level')
+                }
+                self.kafka_consumer.set_topic_mask_config(
+                    topic,
+                    MaskConfig(**_mask_options)
+                )
+        except AttributeError as aer:
+            LOG.error(f'No topic options for {self._id}| {aer}')
 
 
 class PipelineSet(object):
@@ -577,9 +665,6 @@ class PipelineSet(object):
             if not all([definition, getter]):
                 raise ValueError('PipelineSet requires definition and getter')
             self.stages = self._prepare_stages(definition, getter)
-
-    def handle_event(event: Event):
-        pass
 
     def _prepare_stages(self, definition, getter: Callable):
         return [
