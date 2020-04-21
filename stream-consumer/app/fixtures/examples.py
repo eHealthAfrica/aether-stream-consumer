@@ -70,6 +70,11 @@ BASE_TRANSITION_FAIL.update({
     'fail_condition': '$.ref.`notmatch(200, null)`'
 })
 
+XF_ZEEBE_SPAWN_REQUIRED = {
+    'id': 'default',
+    'name': 'Needs other vars',
+}
+
 XF_ZEEBE_SPAWN = {
     'id': 'echo',
     'name': 'echo',
@@ -88,6 +93,11 @@ XF_ZEEBE_SPAWN_CONSTS = {
     'workflow': 'flow',
     'mapping': {},
     'message_iterator': '$.all_messages',
+}
+
+XF_ZEEBE_SPAWN_REQUIRED = {
+    'id': 'default',
+    'name': 'Needs other vars',
 }
 
 XF_JS_ADDER = {
@@ -163,6 +173,19 @@ XF_JS_SIZER = {
     }
     ''',
     'arguments': ['obj']
+}
+
+XF_JS_ISODD = {
+    'id': 'isodd',
+    'name': 'Is it odd?',
+    'entrypoint': 'f',
+    'script': '''
+    function f(value) {
+        return (value % 2) != 0;
+    }
+
+    ''',
+    'arguments': {'value': 'int'}
 }
 
 XF_JS_CSV_PARSER = {
@@ -273,12 +296,63 @@ PIPELINE_ZEEBE = {**PIPELINE_SIMPLE, **{
     'zeebe_subscription': 'the_source'
 }}
 
-PIPELINE_KAFKA = {**PIPELINE_SIMPLE, **{
+PIPELINE_KAFKA = {
     'id': 'kafka',
     'name': 'something',
     'zeebe_instance': 'default',
-    'kafka_subscription': deepcopy(KAFKA_SUBSCRIPTION)
-}}
+    'kafka_subscription': deepcopy(KAFKA_SUBSCRIPTION),
+    'const': {
+        'workflow': 'sort-flow',
+        'single': 'single',
+        'spawn_mapping': {
+            'isOdd': '$.two.result',
+            'message': '$.source.message',
+        }
+    },
+    'stages': [
+        {
+            'name': 'one',
+            'type': 'jscall',
+            'id': 'sizer',
+            'transition': {
+                'input_map': {
+                    'obj': '$.source.message'
+                },
+                'output_map': {
+                    'result': '$.result'
+                }
+            }
+        },
+        {
+            'name': 'two',
+            'type': 'jscall',
+            'id': 'isodd',
+            'transition': {
+                'input_map': {
+                    'value': '$.one.result'
+                },
+                'output_map': {
+                    'result': '$.result'
+                }
+            }
+        },
+        {
+            'name': 'three',
+            'type': 'zeebespawn',
+            'id': 'default',
+            'transition': {
+                'input_map': {
+                    'workflow': '$.const.workflow',
+                    'mode': '$.const.single',
+                    'mapping': '$.const.spawn_mapping'
+                },
+                'output_map': {
+                    'result': '$.result'
+                }
+            }
+        }
+    ]
+}
 
 PIPELINE_KAFKA_ZEEBE = {
     'id': 'kafka-zb',

@@ -93,6 +93,13 @@ def bpmn_echo():
         yield f.read()
 
 
+@pytest.mark.integration
+@pytest.fixture(scope='session')
+def bpmn_sort():
+    with open('/code/bpmn/sort.bpmn', 'rb') as f:
+        yield f.read()
+
+
 @pytest.mark.unit
 @pytest.mark.integration
 @pytest.fixture(scope='session')
@@ -199,6 +206,8 @@ def transformation_definitions():
 
     pairs = [
         ('zeebe', examples.ZEEBE_INSTANCE),
+        ('zeebespawn', examples.XF_ZEEBE_SPAWN_REQUIRED),
+        ('jscall', examples.XF_JS_ISODD),
         ('jscall', examples.XF_JS_SIZER),
         ('jscall', examples.XF_JS_ADDER),
         ('jscall', examples.XF_JS_CSV_PARSER),

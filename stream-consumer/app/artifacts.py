@@ -186,6 +186,7 @@ class ZeebeSpawn(Transformation):
         'message_iterator',
         'mapping'
     ]
+    jobs_path = None
 
     def run(self, context: PipelineContext, transition: Transition) -> Dict:
         try:
@@ -194,6 +195,7 @@ class ZeebeSpawn(Transformation):
                                    ' a ZeebeConnection, found None')
             local_context = transition.prepare_input(context.data, self.definition)
             transition.check_failure(local_context)
+            # connection: ZeebeConnection = context.zeebe.get_connection()
             for wf_name, inner_context in self._prepare_spawns(**local_context):
                 self._handle_spawn(wf_name, inner_context, context.zeebe)
             return {'success': True}
@@ -236,7 +238,12 @@ class ZeebeSpawn(Transformation):
         else:
             raise RuntimeError(f'Expected mode in [single, multiple], got {mode}')
 
-    def _handle_spawn(self, wf_name, local_context, zeebe):
+    def _handle_spawn(
+        self,
+        wf_name: str,
+        local_context: Dict,
+        zeebe: ZeebeConnection
+    ):
         next(zeebe.create_instance(wf_name, variables=local_context))
         return {'success': True}
 
@@ -309,6 +316,7 @@ class Pipeline(BaseResource):
                 res.append((True, self.pipeline_set.run(ctx)))
             except Exception as err:
                 res.append((False, err))
+                raise err
         return res
 
     # public!

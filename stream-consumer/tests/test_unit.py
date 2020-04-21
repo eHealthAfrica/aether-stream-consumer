@@ -274,9 +274,12 @@ def test__stage_simple():
 
 @pytest.mark.parametrize('_type,_id,kwargs,result_key,result_value,error', [
     ('jscall', 'sizer', {'obj': 1}, 'result', 8, None),
+    ('jscall', 'sizer', {'obj': True}, 'result', 4, None),
     ('jscall', 'sizer', {'obj': 'a'}, 'result', 2, None),
     ('jscall', 'sizer', {'obj': [1, 2, 3]}, 'result', 24, None),
     ('jscall', 'sizer', {'obj': {'an': 'obj'}}, 'result', 6, None),
+    ('jscall', 'isodd', {'value': 1}, 'result', True, None),
+    ('jscall', 'isodd', {'value': 2}, 'result', False, None),
     ('jscall', 'adder', {'a': 1, 'b': 2}, 'result', 3, None),
     ('jscall', 'adder', {'a': 101, 'b': 2}, 'result', 103, None),
     ('jscall', 'parser', {'jsonBody': {'a': 1, 'b': 2}}, 'result', '''"a","b"\n1,2''', None),

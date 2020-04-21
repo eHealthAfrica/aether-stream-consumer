@@ -559,7 +559,13 @@ class Stage:
     __transform_getter: Callable = None
 
     def run(self, context: PipelineContext):
-        return self.__get_transformation().run(context, self.transition)
+        try:
+            return self.__get_transformation().run(context, self.transition)
+        except AttributeError:
+            raise TransformationError(
+                f'Transformation type: "{self.transform_type}"'
+                f' with id: "{self.transform_id}" not found.'
+            )
 
     def __get_transformation(self) -> 'Transformation':  # noqa
         # having a getter here helps make testing more easy to implement.
@@ -572,7 +578,7 @@ class PipelinePubSub(object):
         tenant: str,
         kafka_group=None,
         definition: Dict = None,
-        zeebe: ZeebeConnection = None
+        zeebe: 'ZeebeInstance' = None  # noqa  type hint
     ):
         self.tenant = tenant
         self.kafka_group_id = kafka_group
@@ -580,15 +586,20 @@ class PipelinePubSub(object):
         self.kafka_consumer = None
         self.kafka_producer = None
         self.source_type = None
-        self.zeebe = zeebe
+        self.zeebe: 'ZeebeInstance' = zeebe  # noqa
+        self.zeebe_connection: ZeebeConnection = None
 
     def _make_context(self, evt: Event):
         data = {}
         if self.definition.get('const'):
             data = {'const': self.definition['const']}
+        if not self.zeebe_connection:
+            self.zeebe_connection = (None  # noqa
+                if not self.zeebe \
+                else self.zeebe.get_connection())
         return PipelineContext(
             evt,
-            zeebe=self.zeebe,
+            zeebe=self.zeebe_connection,
             kafka_producer=self.kafka_producer,
             data=data
         )
@@ -723,5 +734,9 @@ class PipelineSet(object):
 
     def run(self, context: PipelineContext, raise_errors=True):
         for stage in self.stages:
-            self._execute_stage(stage, context, raise_errors)
+            try:
+                self._execute_stage(stage, context, raise_errors)
+            except Exception as err:
+                raise TransformationError(
+                    f'On Stage "{stage.name}": {type(err).__name__}: {err}')
         return context

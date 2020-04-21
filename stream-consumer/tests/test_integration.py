@@ -43,6 +43,14 @@ def test__broker_connect(zeebe_connection):  # , bad_zeebe_config):
 
 
 @pytest.mark.integration
+def test__deploy_workflow(zeebe_connection, bpmn_echo, bpmn_sort):
+    res = next(zeebe_connection.deploy_workflow('echo-flow', bpmn_echo))
+    LOG.critical(res)
+    res = next(zeebe_connection.deploy_workflow('sort-flow', bpmn_sort))
+    LOG.critical(res)
+
+
+@pytest.mark.integration
 def test__start(StreamConsumer):
     pass
 
@@ -62,6 +70,7 @@ def test__zb_connection(
     # ('restcall', ),
     # ('jscall', ),
     # ('pipeline', ),
+    ('zeebe', examples.ZEEBE_INSTANCE),
     ('jscall', examples.XF_JS_ADDER),
     ('jscall', examples.XF_JS_TYPED_ADDER),
     ('jscall', examples.XF_JS_CSV_PARSER),
@@ -127,6 +136,7 @@ def test__pipeline_adder_test(
 ):
     res = RequestClientT1.post(f'{URL}/pipeline/test?id={_id}', json=body)
     if not error:
+        LOG.critical(res.text)
         res.raise_for_status()
         body = res.json()
         assert(body.get(result_field) == result_value)
@@ -145,82 +155,80 @@ def test__pipeline_read_kafka_sub(
     for x in range(5):
         LOG.debug(pl.run())
 
-# @pytest.mark.integration
-# def test__deploy_workflow(zeebe_connection, bpmn_echo):
-#     res = next(zeebe_connection.deploy_workflow('echo', bpmn_echo))
-#     LOG.critical(res)
+
+@pytest.mark.parametrize('transition', [
+    {
+        'input_map': {
+            'mode': '$.const.mode',
+            'workflow': '$.const.workflow',
+            'mapping': '$.const.mapping',
+            'message_iterator': '$.const.message_iterator',
+            'all_messages': '$.source.all_messages',
+            'status': '$.source.status',
+            'res': '$.source.res'
+        },
+        'pass_condition': '$.status.`match(200, null)`'
+    }
+])
+@pytest.mark.integration
+def test__create_work(zeebe_connection, transition, loaded_instance_manager):
+    _transition = Transition(**transition)
+    xf = artifacts.ZeebeSpawn('_id', examples.BASE_TRANSFORMATION, loaded_instance_manager)
+    context = helpers.PipelineContext(
+        helpers.TestEvent(),
+        zeebe_connection
+    )
+
+    context.data = {
+        'source': {
+            'res': 0
+        },
+        'const': {
+            'mode': 'single',
+            'workflow': 'echo-flow',
+            'mapping': {
+                'res': '$.res'
+            }
+        }
+
+    }
+    # single mode
+    for x in range(0, 5):
+        context.data['source'] = {'res': x, 'status': 200}
+        ok = xf.run(context, _transition)
+        LOG.debug(ok)
+    with pytest.raises(helpers.TransformationError):
+        context.data['source'] = {'res': -99, 'status': 500}
+        ok = xf.run(context, _transition)
+        LOG.debug(ok)
+    # multimode
+
+    context.data = {
+        'source': {
+            'status': 200,
+            'all_messages': [{'res': v} for v in range(10, 15)]
+        },
+        'const': {
+            'mode': 'multiple',
+            'workflow': 'echo-flow',
+            'mapping': {},
+            'message_iterator': '$.all_messages',
+        }
+    }
+    res = xf.run(context, _transition)
+    LOG.debug(res)
 
 
-# @pytest.mark.parametrize('transition', [
-#     {
-#         'input_map': {
-#             'mode': '$.const.mode',
-#             'workflow': '$.const.workflow',
-#             'mapping': '$.const.mapping',
-#             'message_iterator': '$.const.message_iterator',
-#             'all_messages': '$.source.all_messages',
-#             'status': '$.source.status',
-#             'res': '$.source.res'
-#         },
-#         'pass_condition': '$.status.`match(200, null)`'
-#     }
-# ])
-# @pytest.mark.integration
-# def test__create_work(zeebe_connection, transition, loaded_instance_manager):
-#     _transition = Transition(**transition)
-#     xf = artifacts.ZeebeSpawn('_id', examples.BASE_TRANSFORMATION, loaded_instance_manager)
-#     context = helpers.PipelineContext(
-#         helpers.TestEvent(),
-#         zeebe_connection
-#     )
-
-#     context.data = {
-#         'source': {
-#             'res': 0
-#         },
-#         'const': {
-#             'mode': 'single',
-#             'workflow': 'flow',
-#             'mapping': {
-#                 'res': '$.res'
-#             }
-#         }
-
-#     }
-#     # single mode
-#     for x in range(0, 5):
-#         context.data['source'] = {'res': x, 'status': 200}
-#         ok = xf.run(context, _transition)
-#         LOG.debug(ok)
-#     with pytest.raises(helpers.TransformationError):
-#         context.data['source'] = {'res': -99, 'status': 500}
-#         ok = xf.run(context, _transition)
-#         LOG.debug(ok)
-#     # multimode
-
-#     context.data = {
-#         'source': {
-#             'status': 200,
-#             'all_messages': [{'res': v} for v in range(10, 15)]
-#         },
-#         'const': {
-#             'mode': 'multiple',
-#             'workflow': 'flow',
-#             'mapping': {},
-#             'message_iterator': '$.all_messages',
-#         }
-#     }
-#     res = xf.run(context, _transition)
-#     LOG.debug(res)
+@pytest.mark.integration
+def test__do_some_work(zeebe_connection):
+    jobs = zeebe_connection.job_iterator('echo-worker', 'lazyWorker', max=100)
+    for job in jobs:
+        try:
+            job.fail()
+            LOG.debug(job.variables)
+        except Exception as aer:
+            LOG.error(job.variables)
+            LOG.critical(aer)
 
 
-# @pytest.mark.integration
-# def test__do_some_work(zeebe_connection):
-#     jobs = zeebe_connection.job_iterator('python-worker', 'lazyWorker', max=100)
-#     for job in jobs:
-#         try:
-#             job.fail()
-#             LOG.debug(job.variables)
-#         except Exception as aer:
-#             LOG.error(job.variables)
-#             LOG.critical(aer)
+# odds-worker
