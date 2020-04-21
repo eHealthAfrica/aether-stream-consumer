@@ -18,7 +18,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# import fnmatch
 import json  # noqa
 from functools import partial
 from time import sleep
@@ -30,13 +29,6 @@ from typing import (  # noqa
 )
 
 from werkzeug.local import LocalProxy
-
-#     Any,
-#     Callable,
-#     List,
-#     Mapping
-
-
 # from confluent_kafka import KafkaException
 
 # Consumer SDK
@@ -87,10 +79,10 @@ class ZeebeInstance(BaseResource):
         d = self.definition
         self.config: ZeebeConfig = ZeebeConfig(
             url=d.url,
-            client_id=d.client_id,
-            client_secret=d.client_secret,
-            audience=d.audience,
-            token_url=d.token_url
+            client_id=d.get('client_id'),
+            client_secret=d.get('client_secret'),
+            audience=d.get('audience'),
+            token_url=d.get('token_url')
         )
 
     def _on_change(self):

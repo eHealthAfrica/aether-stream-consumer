@@ -20,6 +20,7 @@
 
 from collections import OrderedDict
 from dataclasses import dataclass
+from dataclasses import field as DataClassField
 import enum
 import json
 import grpc
@@ -154,10 +155,17 @@ class Transition:
 @dataclass
 class ZeebeConfig:
     url: str
-    client_id: str
-    client_secret: str
-    audience: str
-    token_url: str
+    client_id: str = None
+    client_secret: str = None
+    audience: str = None
+    token_url: str = None
+    is_secured: bool = DataClassField(init=False)
+
+    def __post_init__(self):
+        if not self.client_id:
+            self.is_secured = False
+        else:
+            self.is_secured = True
 
 
 def get_credentials(config: ZeebeConfig):
@@ -184,13 +192,21 @@ def zboperation(fn):
         inst = args[0]
         try:
             try:
-                with grpc.secure_channel(
-                        *zb_connection_details(inst)) as channel:
-                    kwargs['channel'] = channel
-                    res = fn(*args, **kwargs)
-                    # this is important for job_iterator to work
-                    # without exiting the secure_channel context
-                    yield from res
+                if inst.config.is_secured:
+                    with grpc.secure_channel(
+                            *zb_connection_details(inst)) as channel:
+                        kwargs['channel'] = channel
+                        res = fn(*args, **kwargs)
+                        # this is important for job_iterator to work
+                        # without exiting the secure_channel context
+                        yield from res
+                else:
+                    with grpc.insecure_channel(inst.config.url) as channel:
+                        kwargs['channel'] = channel
+                        res = fn(*args, **kwargs)
+                        # this is important for job_iterator to work
+                        # without exiting the secure_channel context
+                        yield from res
             except (
                 requests.exceptions.HTTPError,
                 requests.exceptions.ConnectionError
@@ -201,11 +217,20 @@ def zboperation(fn):
             except grpc._channel._InactiveRpcError:
                 # expired token
                 inst.credentials = None
-                with grpc.secure_channel(
-                        *zb_connection_details(inst)) as channel:
-                    kwargs['channel'] = channel
-                    res = fn(*args, **kwargs)
-                    yield from res
+                if inst.config.is_secured:
+                    with grpc.secure_channel(
+                            *zb_connection_details(inst)) as channel:
+                        kwargs['channel'] = channel
+                        res = fn(*args, **kwargs)
+                        yield from res
+                else:
+                    with grpc.insecure_channel(inst.config.url) as channel:
+                        kwargs['channel'] = channel
+                        res = fn(*args, **kwargs)
+                        # this is important for job_iterator to work
+                        # without exiting the secure_channel context
+                        yield from res
+
         except requests.exceptions.HTTPError as her:
             raise her
     return wrapper
@@ -265,7 +290,7 @@ class ZeebeConnection(object):
 
 
 def zb_connection_details(inst: ZeebeConnection):
-    if not inst.credentials:
+    if not inst.credentials and inst.config.is_secured:
         inst.credentials = get_credentials(inst.config)
     return [inst.config.url, inst.credentials]
 

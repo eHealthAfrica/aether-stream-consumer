@@ -38,11 +38,11 @@ KAFKA_SUBSCRIPTION = {
 ZEEBE_INSTANCE = {
     'id': 'default',
     'name': 'test_instance of ZB',
-    'url': os.environ['ZEEBE_ADDRESS'],
-    'client_id': os.environ['ZEEBE_CLIENT_ID'],
-    'client_secret': os.environ['ZEEBE_CLIENT_SECRET'],
-    'audience': os.environ['ZEEBE_AUDIENCE'],
-    'token_url': os.environ['ZEEBE_AUTHORIZATION_SERVER_URL']
+    'url': os.environ.get('ZEEBE_ADDRESS'),
+    'client_id': os.environ.get('ZEEBE_CLIENT_ID'),
+    'client_secret': os.environ.get('ZEEBE_CLIENT_SECRET'),
+    'audience': os.environ.get('ZEEBE_AUDIENCE'),
+    'token_url': os.environ.get('ZEEBE_AUTHORIZATION_SERVER_URL')
 }
 
 ZEEBE_SUBSCRIPTION = {

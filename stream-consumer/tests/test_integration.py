@@ -33,13 +33,13 @@ from app.helpers import Transition
 # to run integration tests / all tests run the test_all.sh script from the /tests directory.
 
 
-# @pytest.mark.integration
-# def test__broker_connect(zeebe_connection, bad_zeebe_config):
-#     res = next(zeebe_connection.get_topology())
-#     assert(res.brokers is not None)
-#     bad_conn = helpers.ZeebeConnection(bad_zeebe_config)
-#     with pytest.raises(requests.exceptions.HTTPError):
-#         next(bad_conn.get_topology())
+@pytest.mark.integration
+def test__broker_connect(zeebe_connection):  # , bad_zeebe_config):
+    res = next(zeebe_connection.get_topology())
+    assert(res.brokers is not None)
+    # bad_conn = helpers.ZeebeConnection(bad_zeebe_config)
+    # with pytest.raises(requests.exceptions.HTTPError):
+    #     next(bad_conn.get_topology())
 
 
 @pytest.mark.integration

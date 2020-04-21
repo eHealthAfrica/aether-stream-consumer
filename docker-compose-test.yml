@@ -20,11 +20,25 @@ services:
       SASL.PASSWORD: ${KAFKA_SASL_PASSWORD}
 
       # TEST Zeebe instance
-      ZEEBE_ADDRESS: ${ZEEBE_ADDRESS}
-      ZEEBE_AUDIENCE: ${ZEEBE_AUDIENCE}
-      ZEEBE_CLIENT_ID: ${ZEEBE_CLIENT_ID}
-      ZEEBE_CLIENT_SECRET: ${ZEEBE_CLIENT_SECRET}
-      ZEEBE_AUTHORIZATION_SERVER_URL: ${ZEEBE_AUTHORIZATION_SERVER_URL}
+      ZEEBE_ADDRESS: zeebe:26500
+      # ZEEBE_ADDRESS: ${ZEEBE_ADDRESS}
+      # ZEEBE_AUDIENCE: ${ZEEBE_AUDIENCE}
+      # ZEEBE_CLIENT_ID: ${ZEEBE_CLIENT_ID}
+      # ZEEBE_CLIENT_SECRET: ${ZEEBE_CLIENT_SECRET}
+      # ZEEBE_AUTHORIZATION_SERVER_URL: ${ZEEBE_AUTHORIZATION_SERVER_URL}
+
+  zeebe:
+    # restart: always
+    container_name: zeebe_broker
+    image: camunda/zeebe:0.22.1
+    environment:
+      - ZEEBE_LOG_LEVEL=debug
+    volumes:
+      - ./conf/zeebe.cfg.toml:/usr/local/zeebe/conf/zeebe.cfg.toml
+
+    # ports:
+    #   - "26500:26500"
+    #   - "9600:9600"
 
   redis:
     image: redis:alpine

@@ -104,11 +104,11 @@ def BaseTransition():
 @pytest.fixture(scope='session')
 def zeebe_config():
     conf = helpers.ZeebeConfig(
-        url=os.environ['ZEEBE_ADDRESS'],
-        client_id=os.environ['ZEEBE_CLIENT_ID'],
-        client_secret=os.environ['ZEEBE_CLIENT_SECRET'],
-        audience=os.environ['ZEEBE_AUDIENCE'],
-        token_url=os.environ['ZEEBE_AUTHORIZATION_SERVER_URL']
+        url=os.environ.get('ZEEBE_ADDRESS'),
+        client_id=os.environ.get('ZEEBE_CLIENT_ID'),
+        client_secret=os.environ.get('ZEEBE_CLIENT_SECRET'),
+        audience=os.environ.get('ZEEBE_AUDIENCE'),
+        token_url=os.environ.get('ZEEBE_AUTHORIZATION_SERVER_URL')
     )
     yield conf
 
@@ -117,11 +117,11 @@ def zeebe_config():
 @pytest.fixture(scope='session')
 def bad_zeebe_config():
     conf = helpers.ZeebeConfig(
-        url=os.environ['ZEEBE_ADDRESS'],
-        client_id=os.environ['ZEEBE_CLIENT_ID'],
+        url=os.environ.get('ZEEBE_ADDRESS'),
+        client_id=os.environ.get('ZEEBE_CLIENT_ID'),
         client_secret='bad',
-        audience=os.environ['ZEEBE_AUDIENCE'],
-        token_url=os.environ['ZEEBE_AUTHORIZATION_SERVER_URL']
+        audience=os.environ.get('ZEEBE_AUDIENCE'),
+        token_url=os.environ.get('ZEEBE_AUTHORIZATION_SERVER_URL')
     )
     yield conf
 
