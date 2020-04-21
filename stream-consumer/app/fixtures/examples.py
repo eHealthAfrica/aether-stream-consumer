@@ -18,6 +18,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import os
 from copy import deepcopy
 
 KAFKA_SUBSCRIPTION = {
@@ -34,7 +35,15 @@ KAFKA_SUBSCRIPTION = {
     }                                              # or hard-code like a/b/c
 }
 
-ZEEBE_INSTANCE = {}
+ZEEBE_INSTANCE = {
+    'id': 'default',
+    'name': 'test_instance of ZB',
+    'url': os.environ['ZEEBE_ADDRESS'],
+    'client_id': os.environ['ZEEBE_CLIENT_ID'],
+    'client_secret': os.environ['ZEEBE_CLIENT_SECRET'],
+    'audience': os.environ['ZEEBE_AUDIENCE'],
+    'token_url': os.environ['ZEEBE_AUTHORIZATION_SERVER_URL']
+}
 
 ZEEBE_SUBSCRIPTION = {
 
@@ -113,6 +122,49 @@ XF_JS_TYPED_ADDER = {
     'arguments': {'a': 'int', 'b': 'int'}
 }
 
+XF_JS_SIZER = {
+    'id': 'sizer',
+    'name': 'Sizes a JS object. Pretty useless.',
+    'entrypoint': 'sizeOf',
+    'script': '''
+
+    function sizeOf( obj ) {
+
+        var objectList = [];
+        var stack = [ obj ];
+        var bytes = 0;
+
+        while ( stack.length ) {
+            var value = stack.pop();
+
+            if ( typeof value === 'boolean' ) {
+                bytes += 4;
+            }
+            else if ( typeof value === 'string' ) {
+                bytes += value.length * 2;
+            }
+            else if ( typeof value === 'number' ) {
+                bytes += 8;
+            }
+            else if
+            (
+                typeof value === 'object'
+                && objectList.indexOf( value ) === -1
+            )
+            {
+                objectList.push( value );
+
+                for( var i in value ) {
+                    stack.push( value[ i ] );
+                }
+            }
+        }
+        return bytes;
+    }
+    ''',
+    'arguments': ['obj']
+}
+
 XF_JS_CSV_PARSER = {
     'id': 'parser',
     'name': 'CSV Parser',
@@ -139,11 +191,25 @@ REST_TRANSFORMATION = {
     'name': 'simple',
 }
 
+REST_STAGE = {
+    'name': 'entities',
+    'transform_type': 'restcall',
+    'transform_id': None,
+    'transition': {
+        'input_map': {
+            'method': '$.consts.get_method',
+            'url': '$.consts.entities_url'
+        },
+        'output_map': {
+            'status_code': '$.status_code',
+            'messages': '$.json_body.results'
+        }
+    }
+}
+
 ZEEBE_JOB = {
     'id': 'zeebe-default',
     'name': 'Default Stream Consumer Job',
-    'zeebe_instance': 'default',
-    'zeebe_subscription': 'default',
     'pipeline': 'default'
 }
 
@@ -214,23 +280,13 @@ PIPELINE_KAFKA = {**PIPELINE_SIMPLE, **{
     'kafka_subscription': deepcopy(KAFKA_SUBSCRIPTION)
 }}
 
+PIPELINE_KAFKA_ZEEBE = {
+    'id': 'kafka-zb',
+    'name': 'something',
+    'zeebe_instance': 'default',
+    'kafka_subscription': deepcopy(KAFKA_SUBSCRIPTION)
+}
+
 
 ZEEBE_SINK = {}
 KAFKA_SINK = {}
-
-
-REST_STAGE = {
-    'name': 'entities',
-    'transform_type': 'restcall',
-    'transform_id': None,
-    'transition': {
-        'input_map': {
-            'method': '$.consts.get_method',
-            'url': '$.consts.entities_url'
-        },
-        'output_map': {
-            'status_code': '$.status_code',
-            'messages': '$.json_body.results'
-        }
-    }
-}

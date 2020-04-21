@@ -546,7 +546,8 @@ class PipelinePubSub(object):
         self,
         tenant: str,
         kafka_group=None,
-        definition: Dict = None
+        definition: Dict = None,
+        zeebe: ZeebeConnection = None
     ):
         self.tenant = tenant
         self.kafka_group_id = kafka_group
@@ -554,7 +555,7 @@ class PipelinePubSub(object):
         self.kafka_consumer = None
         self.kafka_producer = None
         self.source_type = None
-        self.zeebe = None
+        self.zeebe = zeebe
 
     def _make_context(self, evt: Event):
         data = {}
@@ -582,7 +583,6 @@ class PipelinePubSub(object):
     def __make_kafka_getter(self):
         args = {k.lower(): v for k, v in KAFKA_CONFIG.copy().items()}
         args['group.id'] = self.kafka_group_id
-        LOG.debug(args)
         self.kafka_consumer = KafkaConsumer(**args)
         pattern = self.definition['kafka_subscription'].get('topic_pattern', '*')
         # only allow regex on the end of patterns
@@ -620,8 +620,9 @@ class PipelinePubSub(object):
     # called when a subscription causes a new assignment to be given to the consumer
     def _on_kafka_assign(self, *args, **kwargs):
         assignment = args[1]
-        for _part in assignment:
-            self._apply_consumer_filters(_part.topic)
+        topics = set([_part.topic for _part in assignment])
+        for topic in list(topics):
+            self._apply_consumer_filters(topic)
 
     def _apply_consumer_filters(self, topic):
         try:

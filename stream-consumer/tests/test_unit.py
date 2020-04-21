@@ -38,6 +38,7 @@ from app.helpers import (
     Transition
 )
 
+from aet.exceptions import ConsumerHttpException
 from aet.resource import ResourceDefinition
 
 
@@ -68,8 +69,9 @@ def test__xf_ZeebeComplete_basic():
 
     transformation = artifacts.ZeebeComplete('_id', examples.BASE_TRANSFORMATION, None)
     context = PipelineContext(
-        TestEvent(**{'source': {'ref': 200}}))
+        TestEvent(**{'ref': 200}))
     # context.register_result('source', {'ref': 200})
+    LOG.debug(json.dumps(context.data, indent=2))
     assert(transformation.run(context, transition) == {'ref': 200})
     context.register_result('source', {'ref': 500})
     with pytest.raises(TransformationError):
@@ -271,6 +273,10 @@ def test__stage_simple():
 
 
 @pytest.mark.parametrize('_type,_id,kwargs,result_key,result_value,error', [
+    ('jscall', 'sizer', {'obj': 1}, 'result', 8, None),
+    ('jscall', 'sizer', {'obj': 'a'}, 'result', 2, None),
+    ('jscall', 'sizer', {'obj': [1, 2, 3]}, 'result', 24, None),
+    ('jscall', 'sizer', {'obj': {'an': 'obj'}}, 'result', 6, None),
     ('jscall', 'adder', {'a': 1, 'b': 2}, 'result', 3, None),
     ('jscall', 'adder', {'a': 101, 'b': 2}, 'result', 103, None),
     ('jscall', 'parser', {'jsonBody': {'a': 1, 'b': 2}}, 'result', '''"a","b"\n1,2''', None),
@@ -288,11 +294,12 @@ def test__xf_jscall_remote_test(
     error
 ):
     xf = loaded_instance_manager.get(_id, _type, TENANT)
-    res = xf.test(json_body=kwargs)
     if not error:
+        res = xf.test(json_body=kwargs)
         assert(res[result_key] == result_value)
-    else:
-        assert(res == error)
+    with pytest.raises(Exception) as aer:
+        res = xf.test(json_body=kwargs)
+        assert(aer == error)
 
 
 @responses.activate
@@ -321,11 +328,13 @@ def test__xf_rest_remote_test(
     responses.add(method, url, body=body, status=200)
 
     xf = loaded_instance_manager.get(_id, _type, TENANT)
-    res = xf.test(json_body=kwargs)
     if not error:
+        res = xf.test(json_body=kwargs)
         assert(res[result_key] == result_value)
     else:
-        assert(res == error)
+        with pytest.raises(Exception) as aer:
+            res = xf.test(json_body=kwargs)
+            assert(aer == error)
 
 
 @pytest.mark.unit
@@ -360,10 +369,11 @@ def test__pipelineset_simple():
 def test__Pipeline_adder(loaded_instance_manager):
     p = artifacts.Pipeline(TENANT, examples.PIPELINE_SIMPLE, loaded_instance_manager)
     for x in range(5):
-        a = p.test(**{
-            'json_body': {
-                'source': {'value': 100 + x}
-            }
+        data = p.test(**{
+            'json_body': {'value': 100 + x}
         })
-        data = json.loads(a)
         assert(data['three']['result'] == 100 + x + 3)
+    with pytest.raises(ConsumerHttpException):
+        p.test(**{
+            'json_body': {'value': 'a'}
+        })

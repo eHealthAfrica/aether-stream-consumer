@@ -47,6 +47,14 @@ def test__start(StreamConsumer):
     pass
 
 
+@pytest.mark.integration
+def test__zb_connection(
+    loaded_instance_manager
+):
+    zb = loaded_instance_manager.get('default', 'zeebe', TENANT)
+    assert(zb.test() is True)
+
+
 @pytest.mark.parametrize('ep,artifact', [
     # ('zeebe', ),
     # ('zeebecomplete', ),
@@ -135,7 +143,7 @@ def test__pipeline_read_kafka_sub(
 ):
     pl = loaded_instance_manager.get('kafka', 'pipeline', TENANT)
     for x in range(5):
-        pl.run()
+        LOG.debug(pl.run())
 
 # @pytest.mark.integration
 # def test__deploy_workflow(zeebe_connection, bpmn_echo):

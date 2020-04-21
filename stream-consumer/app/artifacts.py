@@ -44,7 +44,7 @@ from aet.exceptions import ConsumerHttpException
 from aet.job import BaseJob, JobStatus
 from aet.logger import get_logger
 from aet.jsonpath import CachedParser
-from aet.resource import BaseResource, lock
+from aet.resource import BaseResource, lock  # noqa
 
 # Aether python lib
 # from aether.python.avro.schema import Node
@@ -64,6 +64,8 @@ from app.helpers import (  # noqa
     TestEvent,
     TransformationError,
     Transition,
+    ZeebeConfig,
+    ZeebeConnection,
     ZeebeJob
 )
 
@@ -75,22 +77,32 @@ KAFKA_CONFIG = get_kafka_config()
 
 class ZeebeInstance(BaseResource):
     schema = schemas.PERMISSIVE
-    jobs_path = '$.zeebe_instance'
+    jobs_path = None
     name = 'zeebe'
     public_actions = BaseResource.public_actions + [
-        'test_connection'
+        'test'
     ]
 
-    def __init__(self, tenant, definition, app=None):
-        super().__init__(tenant, definition)
+    def _on_init(self):
+        d = self.definition
+        self.config: ZeebeConfig = ZeebeConfig(
+            url=d.url,
+            client_id=d.client_id,
+            client_secret=d.client_secret,
+            audience=d.audience,
+            token_url=d.token_url
+        )
 
-    @lock
-    def get_session(self):
-        pass
+    def _on_change(self):
+        self._on_init()
+
+    def get_connection(self):
+        return ZeebeConnection(self.config)
 
     # public method
-    def test_connection(self, *args, **kwargs):
-        return True  # TODO
+    def test(self, *args, **kwargs):
+        res = next(self.get_connection().get_topology())
+        return res.brokers is not None
 
 
 # class ZeebeSubscription(BaseResource):
@@ -280,8 +292,20 @@ class Pipeline(BaseResource):
         self.pubsub = PipelinePubSub(
             self.tenant,
             self.kafka_consumer_group,
-            self.definition)
+            self.definition,
+            self._zb()
+        )
         LOG.critical(f'Prepared Pipeline {self.id}')
+
+    def _zb(self):
+        if 'zeebe_instance' in self.definition:
+            zb = self.context.get(
+                self.definition.zeebe_instance,
+                ZeebeInstance.name,
+                self.tenant
+            )
+            return zb
+        return None
 
     def _on_change(self):
         self._on_init()
@@ -289,7 +313,6 @@ class Pipeline(BaseResource):
     def run(self):
         res = []
         for ctx in self.pubsub.get():
-            LOG.debug(json.dumps(ctx.data, indent=2))
             try:
                 res.append((True, self.pipeline_set.run(ctx)))
             except Exception as err:

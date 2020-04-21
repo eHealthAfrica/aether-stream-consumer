@@ -198,6 +198,8 @@ def transformation_definitions():
         return (b['id'], _type, b)
 
     pairs = [
+        ('zeebe', examples.ZEEBE_INSTANCE),
+        ('jscall', examples.XF_JS_SIZER),
         ('jscall', examples.XF_JS_ADDER),
         ('jscall', examples.XF_JS_CSV_PARSER),
         ('jscall', examples.XF_JS_TYPED_ADDER),
