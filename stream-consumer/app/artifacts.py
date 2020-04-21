@@ -155,8 +155,8 @@ class ZeebeComplete(Transformation):
 
     def run(self, context: PipelineContext, transition: Transition) -> Dict:
         input_context = context.data
+        job = context.source_event
         try:
-            job = context.source_event
             local_context = transition.prepare_input(context.data, self.definition)
             # failure / pass based on global context
             transition.check_failure(input_context)
@@ -168,6 +168,10 @@ class ZeebeComplete(Transformation):
             job.complete(variables=local_context)
             return local_context
         except Exception as err:
+            try:
+                job.fail(message=str(err))
+            except Exception:
+                pass
             raise TransformationError(err)
 
 
@@ -245,6 +249,7 @@ class ZeebeSpawn(Transformation):
         zeebe: ZeebeConnection
     ):
         res = next(zeebe.create_instance(wf_name, variables=local_context))
+        LOG.debug(f'started even with {json.dumps(local_context)}')
         return {'result': res}
 
 
@@ -316,7 +321,7 @@ class Pipeline(BaseResource):
                 result = self.pipeline_set.run(ctx)
                 results.append([True, result.data])
             except Exception as err:
-                results.append([False, err])
+                results.append([False, err, ctx.data])
         return results
 
     # public!

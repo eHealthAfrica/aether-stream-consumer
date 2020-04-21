@@ -323,10 +323,18 @@ class ZeebeJob(Event):
         self.stub.FailJob(gateway_pb2.FailJobRequest(
             jobKey=self.key, errorMessage=message))
 
+    def to_json(self):
+        return {
+            'key': self.key,
+            'stub': 'NotSerializable',
+            'variables': self.variables
+        }
+
 
 # TODO implement for Kafka
 class KafkaMessage(Event):
     def __init__(self, msg):
+        self.key = msg.key
         self.topic = msg.topic
         self.value = msg.value
         self.schema = msg.schema
@@ -534,7 +542,12 @@ class PipelineContext(object):
                 k: event.get(k) for k in event.keys()
             })
         elif isinstance(event, KafkaMessage):
-            self.register_result('source', event.value)
+            self.register_result('source', {
+                'message': event.value,
+                'schema': event.schema,
+                'key': event.key,
+                'topic': event.topic
+            })
         if data:
             for k in data.keys():
                 self.register_result(k, data.get(k))
@@ -647,6 +660,7 @@ class PipelinePubSub(object):
             jobs = self.zeebe_connection.job_iterator(workflow_id, self.kafka_group_id, max=50)
             c = 0
             for job in jobs:
+                LOG.debug(f'got job: {json.dumps(job)}')
                 c += 1
                 yield job
             LOG.debug(f'No more jobs available on {workflow_id}, got {c}')

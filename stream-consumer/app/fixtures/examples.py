@@ -304,8 +304,8 @@ PIPELINE_KAFKA = {
         'workflow': 'sort-flow',
         'single': 'single',
         'spawn_mapping': {
-            'isOdd': '$.two.result',
-            'message': '$.source.message',
+            'isOdd': '$.isOdd',
+            'message': '$.message',
         }
     },
     'stages': [
@@ -343,6 +343,8 @@ PIPELINE_KAFKA = {
                 'input_map': {
                     'workflow': '$.const.workflow',
                     'mode': '$.const.single',
+                    'isOdd': '$.two.result',
+                    'message': '$.source.message',
                     'mapping': '$.const.spawn_mapping'
                 },
                 'output_map': {
@@ -367,7 +369,7 @@ PIPELINE_ZEEBE = {
                 'input_map': {
                     'message': '$.source.message'
                 },
-                'pass_condition': '$.source.isOdd.`match(true, null)`'
+                'pass_condition': '$.source.isOdd'  # already a boolean
             }
         }
     ]
