@@ -146,16 +146,6 @@ def test__pipeline_adder_test(
         assert(res.status_code == error)
 
 
-@pytest.mark.integration
-def test__pipeline_read_kafka_sub(
-    StreamConsumer,
-    loaded_instance_manager
-):
-    pl = loaded_instance_manager.get('kafka', 'pipeline', TENANT)
-    for x in range(5):
-        LOG.debug(pl.run())
-
-
 @pytest.mark.parametrize('transition', [
     {
         'input_map': {
@@ -230,5 +220,41 @@ def test__do_some_work(zeebe_connection):
             LOG.error(job.variables)
             LOG.critical(aer)
 
+
+@pytest.mark.integration
+def test__pipeline__read_kafka__make_job(
+    StreamConsumer,
+    loaded_instance_manager
+):
+    pl = loaded_instance_manager.get('kafka', 'pipeline', TENANT)
+    spawned = 0
+    odds = 0
+    for x in range(5):
+        results = pl.run()
+        if results:
+            for res in results:
+                LOG.debug(res)
+                assert(res[0] is True)
+                body = res[1]
+                if body['two']['result']:
+                    odds += 1
+                spawned += 1
+        else:
+            LOG.debug('No work from Kafka this run...')
+    evens = spawned - odds
+    LOG.debug(f'Spawned {spawned} jobs in Zeebe, expecting {evens}')
+    zb = loaded_instance_manager.get('zeebe', 'pipeline', TENANT)
+    found = 0
+    for x in range(5):
+        if found >= evens:
+            LOG.debug('Found all expected work items')
+            break
+        results = zb.run()
+        if results:
+            for res in results:
+                found += 1
+                LOG.debug(res)
+        else:
+            LOG.debug('No work from Zeebe this run...')
 
 # odds-worker

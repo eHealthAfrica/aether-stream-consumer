@@ -244,8 +244,8 @@ class ZeebeSpawn(Transformation):
         local_context: Dict,
         zeebe: ZeebeConnection
     ):
-        next(zeebe.create_instance(wf_name, variables=local_context))
-        return {'success': True}
+        res = next(zeebe.create_instance(wf_name, variables=local_context))
+        return {'result': res}
 
 
 class RestCall(Transformation):
@@ -310,14 +310,14 @@ class Pipeline(BaseResource):
         self._on_init()
 
     def run(self):
-        res = []
+        results = []
         for ctx in self.pubsub.get():
             try:
-                res.append((True, self.pipeline_set.run(ctx)))
+                result = self.pipeline_set.run(ctx)
+                results.append([True, result.data])
             except Exception as err:
-                res.append((False, err))
-                raise err
-        return res
+                results.append([False, err])
+        return results
 
     # public!
     def test(self, request=None, *args, **kwargs):

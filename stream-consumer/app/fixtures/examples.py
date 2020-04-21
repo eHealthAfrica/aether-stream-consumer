@@ -75,6 +75,11 @@ XF_ZEEBE_SPAWN_REQUIRED = {
     'name': 'Needs other vars',
 }
 
+XF_ZEEBE_COMPLETE_REQUIRED = {
+    'id': 'default',
+    'name': 'only needs transitions'
+}
+
 XF_ZEEBE_SPAWN = {
     'id': 'echo',
     'name': 'echo',
@@ -289,12 +294,6 @@ PIPELINE_SIMPLE = {
     ]
 }
 
-PIPELINE_ZEEBE = {**PIPELINE_SIMPLE, **{
-    'id': 'zeebe',
-    'name': 'something',
-    'zeebe_instance': 'default',
-    'zeebe_subscription': 'the_source'
-}}
 
 PIPELINE_KAFKA = {
     'id': 'kafka',
@@ -354,13 +353,25 @@ PIPELINE_KAFKA = {
     ]
 }
 
-PIPELINE_KAFKA_ZEEBE = {
-    'id': 'kafka-zb',
+PIPELINE_ZEEBE = {
+    'id': 'zeebe',
     'name': 'something',
     'zeebe_instance': 'default',
-    'kafka_subscription': deepcopy(KAFKA_SUBSCRIPTION)
+    'zeebe_subscription': 'odds-worker',
+    'stages': [
+        {
+            'name': 'one',
+            'type': 'zeebecomplete',
+            'id': 'default',
+            'transition': {
+                'input_map': {
+                    'message': '$.source.message'
+                },
+                'pass_condition': '$.source.isOdd.`match(true, null)`'
+            }
+        }
+    ]
 }
-
 
 ZEEBE_SINK = {}
 KAFKA_SINK = {}

@@ -207,6 +207,7 @@ def transformation_definitions():
     pairs = [
         ('zeebe', examples.ZEEBE_INSTANCE),
         ('zeebespawn', examples.XF_ZEEBE_SPAWN_REQUIRED),
+        ('zeebecomplete', examples.XF_ZEEBE_COMPLETE_REQUIRED),
         ('jscall', examples.XF_JS_ISODD),
         ('jscall', examples.XF_JS_SIZER),
         ('jscall', examples.XF_JS_ADDER),
@@ -214,7 +215,8 @@ def transformation_definitions():
         ('jscall', examples.XF_JS_TYPED_ADDER),
         ('restcall', examples.REST_TRANSFORMATION),
         ('pipeline', examples.PIPELINE_SIMPLE),
-        ('pipeline', examples.PIPELINE_KAFKA)
+        ('pipeline', examples.PIPELINE_KAFKA),
+        ('pipeline', examples.PIPELINE_ZEEBE)
     ]
 
     yield [_format(*d) for d in pairs]

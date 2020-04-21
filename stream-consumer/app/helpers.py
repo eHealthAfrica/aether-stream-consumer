@@ -628,7 +628,7 @@ class PipelinePubSub(object):
             topic = f'{self.tenant}.{pattern}'
         self.kafka_consumer.subscribe([topic], on_assign=self._on_kafka_assign)
 
-        def _getter():
+        def _getter() -> Iterable[KafkaMessage]:
             messages = self.kafka_consumer.poll_and_deserialize(
                 timeout=5,
                 num_messages=1)
@@ -637,13 +637,24 @@ class PipelinePubSub(object):
         return _getter
 
     def __make_zeebe_getter(self):
-        pass
+        workflow_id = self.definition.get('zeebe_subscription')
+        if not self.zeebe_connection:
+            self.zeebe_connection = (None  # noqa
+                if not self.zeebe \
+                else self.zeebe.get_connection())
+
+        def _getter() -> Iterable[ZeebeJob]:
+            jobs = self.zeebe_connection.job_iterator(workflow_id, self.kafka_group_id, max=50)
+            c = 0
+            for job in jobs:
+                c += 1
+                yield job
+            LOG.debug(f'No more jobs available on {workflow_id}, got {c}')
+        return _getter
 
     def _get_events(self) -> Iterable[Event]:
         _source = self.__message_getter()
         yield from _source()
-        # for msg in _source():
-        #     yield msg
 
     def get(self) -> Iterable[PipelineContext]:
         evts: Iterable[Event] = self._get_events()
