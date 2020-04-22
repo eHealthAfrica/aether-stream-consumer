@@ -46,7 +46,8 @@ from aet.resource import InstanceManager
 
 from aether.python.avro import generation
 
-from app import artifacts, config, consumer
+from app import config, consumer
+from app.artifacts import Job
 
 from app.helpers.zb import ZeebeConfig, ZeebeConnection
 from app.helpers.pipeline import Transition
@@ -229,7 +230,7 @@ def transformation_definitions():
 @pytest.mark.integration
 @pytest.fixture(scope='session')
 def loaded_instance_manager(transformation_definitions):
-    _clses = artifacts.Job._resources
+    _clses = Job._resources
     man = InstanceManager(_clses)
     for _id, _type, body in transformation_definitions:
         man.update(_id, _type, TENANT, body)

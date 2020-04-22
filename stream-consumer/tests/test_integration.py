@@ -23,7 +23,7 @@ from time import sleep
 
 from requests.exceptions import HTTPError
 
-from app import artifacts
+from app import transforms
 from app.helpers.pipeline import PipelineContext, Transition
 from app.helpers.event import TestEvent
 from app.helpers import TransformationError
@@ -166,7 +166,7 @@ def test__pipeline_adder_test(
 @pytest.mark.integration
 def test__create_work(zeebe_connection, transition, loaded_instance_manager):
     _transition = Transition(**transition)
-    xf = artifacts.ZeebeSpawn('_id', examples.BASE_TRANSFORMATION, loaded_instance_manager)
+    xf = transforms.ZeebeSpawn('_id', examples.BASE_TRANSFORMATION, loaded_instance_manager)
     context = PipelineContext(
         TestEvent(),
         zeebe_connection
