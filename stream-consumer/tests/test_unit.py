@@ -27,14 +27,15 @@ from . import TENANT
 from . import *  # noqa
 from app.fixtures import examples
 from app import artifacts
-from app.helpers import (
-    JSHelper,
+from app.helpers import TransformationError
+from app.helpers.js import JSHelper
+from app.helpers.rest import RestHelper
+from app.helpers.event import TestEvent
+
+from app.helpers.pipeline import (
     PipelineContext,
     PipelineSet,
-    RestHelper,
     Stage,
-    TestEvent,
-    TransformationError,
     Transition
 )
 

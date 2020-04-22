@@ -18,19 +18,20 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import pytest
+from time import sleep
+
 from requests.exceptions import HTTPError
 
-from . import *  # get all test assets from test/__init__.py
-from app.helpers import Transition
+from app import artifacts
+from app.helpers.pipeline import PipelineContext, Transition
+from app.helpers.event import TestEvent
+from app.helpers import TransformationError
+from app.fixtures import examples
 
-# Test Suite contains both unit and integration tests
-# Unit tests can be run on their own from the root directory
-# enter the bash environment for the version of python you want to test
-# for example for python 3
-# `docker-compose run consumer-sdk-test bash`
-# then start the unit tests with
-# `pytest -m unit`
-# to run integration tests / all tests run the test_all.sh script from the /tests directory.
+from .import LOG, TENANT, URL
+
+from . import *  # noqa
 
 
 @pytest.mark.integration
@@ -166,8 +167,8 @@ def test__pipeline_adder_test(
 def test__create_work(zeebe_connection, transition, loaded_instance_manager):
     _transition = Transition(**transition)
     xf = artifacts.ZeebeSpawn('_id', examples.BASE_TRANSFORMATION, loaded_instance_manager)
-    context = helpers.PipelineContext(
-        helpers.TestEvent(),
+    context = PipelineContext(
+        TestEvent(),
         zeebe_connection
     )
 
@@ -186,7 +187,7 @@ def test__create_work(zeebe_connection, transition, loaded_instance_manager):
         context.data['source'] = {'res': x, 'status': 200}
         ok = xf.run(context, _transition)
         LOG.debug(ok)
-    with pytest.raises(helpers.TransformationError):
+    with pytest.raises(TransformationError):
         context.data['source'] = {'res': -99, 'status': 500}
         ok = xf.run(context, _transition)
         LOG.debug(ok)
@@ -255,5 +256,3 @@ def test__pipeline__read_kafka__make_job(
                 LOG.debug(res)
         else:
             LOG.debug('No work from Zeebe this run...')
-
-# odds-worker

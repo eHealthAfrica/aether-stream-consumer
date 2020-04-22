@@ -22,7 +22,6 @@
 import json
 import pytest
 import os
-from time import sleep
 from uuid import uuid4
 # from unittest.mock import patch
 
@@ -47,7 +46,11 @@ from aet.resource import InstanceManager
 
 from aether.python.avro import generation
 
-from app import artifacts, config, consumer, helpers
+from app import artifacts, config, consumer
+
+from app.helpers.zb import ZeebeConfig, ZeebeConnection
+from app.helpers.pipeline import Transition
+
 from app.fixtures import examples
 
 CONSUMER_CONFIG = config.consumer_config
@@ -104,13 +107,13 @@ def bpmn_sort():
 @pytest.mark.integration
 @pytest.fixture(scope='session')
 def BaseTransition():
-    return helpers.Transition(**examples.BASE_TRANSITION)
+    return Transition(**examples.BASE_TRANSITION)
 
 
 @pytest.mark.integration
 @pytest.fixture(scope='session')
 def zeebe_config():
-    conf = helpers.ZeebeConfig(
+    conf = ZeebeConfig(
         url=os.environ.get('ZEEBE_ADDRESS'),
         client_id=os.environ.get('ZEEBE_CLIENT_ID'),
         client_secret=os.environ.get('ZEEBE_CLIENT_SECRET'),
@@ -123,7 +126,7 @@ def zeebe_config():
 @pytest.mark.integration
 @pytest.fixture(scope='session')
 def bad_zeebe_config():
-    conf = helpers.ZeebeConfig(
+    conf = ZeebeConfig(
         url=os.environ.get('ZEEBE_ADDRESS'),
         client_id=os.environ.get('ZEEBE_CLIENT_ID'),
         client_secret='bad',
@@ -136,7 +139,7 @@ def bad_zeebe_config():
 @pytest.mark.integration
 @pytest.fixture(scope='session')
 def zeebe_connection(zeebe_config):
-    yield helpers.ZeebeConnection(zeebe_config)
+    yield ZeebeConnection(zeebe_config)
 
 
 @pytest.mark.unit

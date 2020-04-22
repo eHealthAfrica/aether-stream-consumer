@@ -43,22 +43,30 @@ from aet.resource import BaseResource, lock  # noqa
 
 from app.config import get_consumer_config, get_kafka_config
 from app.fixtures import schemas
-from app.helpers import (  # noqa
-    check_required,
-    Event,
-    JSHelper,
-    KafkaMessage,
+
+
+from app.helpers import check_required, TransformationError
+from app.helpers.js import JSHelper
+from app.helpers.rest import RestHelper
+from app.helpers.event import (
+    # Event,
+    # KafkaMessage,
+    TestEvent,
+    ZeebeJob
+)
+
+
+from app.helpers.pipeline import (
     PipelinePubSub,
     PipelineContext,
     PipelineSet,
-    RestHelper,
-    Stage,
-    TestEvent,
-    TransformationError,
-    Transition,
+    # Stage,
+    Transition
+)
+
+from app.helpers.zb import (
     ZeebeConfig,
-    ZeebeConnection,
-    ZeebeJob
+    ZeebeConnection
 )
 
 
