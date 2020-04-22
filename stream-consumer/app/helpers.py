@@ -51,7 +51,7 @@ from aet.kafka import KafkaConsumer, FilterConfig, MaskConfig
 
 from app.config import get_kafka_config
 
-LOG = get_logger('helr')
+LOG = get_logger('hlpr')
 KAFKA_CONFIG = get_kafka_config()
 
 
@@ -68,7 +68,7 @@ def check_required(class_fields):
                 required = getattr(args[0], field)
                 missing = [i for i in required if kwargs.get(i) is None]
                 if missing:
-                    failed.append('Expected required fields, missing {missing}')
+                    failed.append(f'Expected required fields, missing {missing}')
             if len(failed) >= len(fields):
                 raise RuntimeError(f'And '.join(failed))
             return f(*args, **kwargs)

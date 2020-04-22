@@ -151,11 +151,13 @@ def test__pipeline_adder_test(
         'input_map': {
             'mode': '$.const.mode',
             'workflow': '$.const.workflow',
-            'mapping': '$.const.mapping',
             'message_iterator': '$.const.message_iterator',
             'all_messages': '$.source.all_messages',
             'status': '$.source.status',
             'res': '$.source.res'
+        },
+        'output_map': {
+            'res': '$.res'
         },
         'pass_condition': '$.status.`match(200, null)`'
     }
@@ -176,9 +178,6 @@ def test__create_work(zeebe_connection, transition, loaded_instance_manager):
         'const': {
             'mode': 'single',
             'workflow': 'echo-flow',
-            'mapping': {
-                'res': '$.res'
-            }
         }
 
     }

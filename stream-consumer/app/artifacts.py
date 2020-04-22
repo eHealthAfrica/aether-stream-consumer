@@ -199,8 +199,9 @@ class ZeebeSpawn(Transformation):
                                    ' a ZeebeConnection, found None')
             local_context = transition.prepare_input(context.data, self.definition)
             transition.check_failure(local_context)
-            # connection: ZeebeConnection = context.zeebe.get_connection()
-            for wf_name, inner_context in self._prepare_spawns(**local_context):
+            for wf_name, inner_context in self._prepare_spawns(
+                    mapping=transition.output_map,
+                    **local_context):
                 self._handle_spawn(wf_name, inner_context, context.zeebe)
             return {'success': True}
         except Exception as err:

@@ -96,7 +96,6 @@ XF_ZEEBE_SPAWN_CONSTS = {
     'name': 'flow',
     'mode': 'multiple',
     'workflow': 'flow',
-    'mapping': {},
     'message_iterator': '$.all_messages',
 }
 
@@ -303,10 +302,6 @@ PIPELINE_KAFKA = {
     'const': {
         'workflow': 'sort-flow',
         'single': 'single',
-        'spawn_mapping': {
-            'isOdd': '$.isOdd',
-            'message': '$.message',
-        }
     },
     'stages': [
         {
@@ -344,11 +339,11 @@ PIPELINE_KAFKA = {
                     'workflow': '$.const.workflow',
                     'mode': '$.const.single',
                     'isOdd': '$.two.result',
-                    'message': '$.source.message',
-                    'mapping': '$.const.spawn_mapping'
+                    'message': '$.source.message'
                 },
                 'output_map': {
-                    'result': '$.result'
+                    'isOdd': '$.isOdd',
+                    'message': '$.message'
                 }
             }
         }
@@ -369,7 +364,7 @@ PIPELINE_ZEEBE = {
                 'input_map': {
                     'message': '$.source.message'
                 },
-                'pass_condition': '$.source.isOdd'  # already a boolean
+                'fail_condition': '$.source.isOdd'  # already a boolean
             }
         }
     ]
