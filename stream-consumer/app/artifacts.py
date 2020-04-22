@@ -21,6 +21,9 @@
 # import json  # noqa
 from functools import partial
 from time import sleep
+from typing import (
+    List
+)
 
 from werkzeug.local import LocalProxy
 # from confluent_kafka import KafkaException
@@ -51,6 +54,11 @@ from app.helpers.zb import (
 LOG = get_logger('artifacts')
 CONSUMER_CONFIG = get_consumer_config()
 KAFKA_CONFIG = get_kafka_config()
+
+
+'''
+! See .transforms for more Resources
+'''
 
 
 class ZeebeInstance(BaseResource):
@@ -86,7 +94,7 @@ class ZeebeInstance(BaseResource):
 class Pipeline(BaseResource):
     schema = schemas.PERMISSIVE
     name = 'pipeline'
-    jobs_path = None
+    jobs_path = '$.pipelines'
 
     public_actions = BaseResource.public_actions + [
         'test'
@@ -158,27 +166,43 @@ class Job(BaseJob):
     ]
     schema = schemas.PERMISSIVE
 
-    public_actions = BaseJob.public_actions + [
-        'get_logs',
-        'list_topics',
-        'list_subscribed_topics'
-    ]
-    # publicly available list of topics
+    public_actions = BaseJob.public_actions
+
+    _pipelines = None
 
     def _setup(self):
-        pass
+        self._pipelines = []
 
-    # def _job_firebase(self, config=None) -> FirebaseInstance:
-    #     if config:
-    #         fb: List[FirebaseInstance] = self.get_resources('firebase', config)
-    #         if not fb:
-    #             raise ConsumerHttpException('No Firebase associated with Job', 400)
-    #         self._firebase = fb[0]
-    #     return self._firebase
+    def _job_pipelines(self, config=None) -> List[Pipeline]:
+        if config:
+            pl = self.get_resources('pipeline', config)
+            if not pl:
+                raise ConsumerHttpException('No Pipeline associated with Job', 400)
+        self._pipelines = pl
+        return self._pipelines
 
     def _get_messages(self, config):
         try:
-            pass
+            pls: List[Pipeline] = self._job_pipelines()
+            for pl in pls:
+                completed = 0
+                ok = 0
+                failed = 0
+                results = pl.run()
+                if results:
+                    for res in results:
+                        completed += 1
+                        if res[0] is True:
+                            ok += 1
+                        else:
+                            self.log.debug(res[1])
+                            failed += 1
+
+                    self.log.debug(f'Pipeline: {pl.id} did work: ok/failed/total ='
+                                   f' {ok}/{failed}/{completed}')
+                else:
+                    self.log.debug(f'Pipeline {pl.id} is idle')
+            return []
         except ConsumerHttpException as cer:
             self.log.debug(f'Job not ready: {cer}')
             self.status = JobStatus.RECONFIGURE
@@ -187,21 +211,6 @@ class Job(BaseJob):
         except Exception as err:
             self.log.critical(f'unhandled error: {str(err)}')
             raise err
-
-    def _handle_new_subscriptions(self, subs):
-        old_subs = list(sorted(set(self.subscribed_topics.values())))
-        for sub in subs:
-            pattern = sub.definition.topic_pattern
-            # only allow regex on the end of patterns
-            if pattern.endswith('*'):
-                self.subscribed_topics[sub.id] = f'^{self.tenant}.{pattern}'
-            else:
-                self.subscribed_topics[sub.id] = f'{self.tenant}.{pattern}'
-        new_subs = list(sorted(set(self.subscribed_topics.values())))
-        _diff = list(set(old_subs).symmetric_difference(set(new_subs)))
-        if _diff:
-            self.log.info(f'{self.tenant} added subs to topics: {_diff}')
-            self.consumer.subscribe(new_subs, on_assign=self._on_assign)
 
     def _handle_messages(self, config, messages):
         pass
