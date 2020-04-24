@@ -20,13 +20,15 @@
 
 import pytest
 from time import sleep
+from uuid import uuid4
 
 from requests.exceptions import HTTPError
 
 from app import transforms
+from app.helpers import TransformationError
 from app.helpers.pipeline import PipelineContext, Transition
 from app.helpers.event import TestEvent
-from app.helpers import TransformationError
+from app.helpers.zb import ZeebeError
 from app.fixtures import examples
 
 from .import LOG, TENANT, URL
@@ -35,12 +37,34 @@ from . import *  # noqa
 
 
 @pytest.mark.integration
-def test__broker_connect(zeebe_connection):  # , bad_zeebe_config):
+def test__broker_connect(zeebe_connection):
     res = next(zeebe_connection.get_topology())
     assert(res.brokers is not None)
-    # bad_conn = helpers.ZeebeConnection(bad_zeebe_config)
-    # with pytest.raises(requests.exceptions.HTTPError):
-    #     next(bad_conn.get_topology())
+
+
+# Only works against a Zeebe that uses credentials, which we can't easily do locally.
+
+# @pytest.mark.integration
+# def test__broker_bad_credentials(bad_zeebe_config):
+#     conn = ZeebeConnection(bad_zeebe_config)
+#     res = next(conn.get_topology())
+# throws a HTTPError (401)
+
+
+@pytest.mark.integration
+def test__broker_send_message(zeebe_connection):
+    msg = {
+        'message_id': str(uuid4()),
+        'listener_name': 'test-listener',
+        'variables': {'something': 'meaningful'}
+    }
+    res = next(zeebe_connection.send_message(**msg))
+    assert(type(res).__name__ == 'PublishMessageResponse')
+
+    with pytest.raises(ZeebeError) as zer:
+        next(zeebe_connection.send_message(**msg))
+        # have to get actual exception from pytest catcher, not zer directly
+        assert(zer.exception.code == 'StatusCode.ALREADY_EXISTS')
 
 
 @pytest.mark.integration

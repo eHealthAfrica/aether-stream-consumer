@@ -41,7 +41,7 @@ from . import TransformationError
 from .event import Event, KafkaMessage, TestEvent, ZeebeJob
 from .zb import ZeebeConnection
 
-LOG = get_logger('trns')
+LOG = get_logger('pipe')
 KAFKA_CONFIG = get_kafka_config()
 
 

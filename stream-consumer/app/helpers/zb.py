@@ -22,13 +22,38 @@ from dataclasses import dataclass
 from dataclasses import field as DataClassField
 import json
 
+from typing import (
+    Dict,
+    Callable,
+    List
+)
+
 import grpc
 import requests
 from zeebe_grpc import (
     gateway_pb2,
     gateway_pb2_grpc
 )
+
+from aet.logger import get_logger
+
 from .event import ZeebeJob
+
+
+LOG = get_logger('zb')
+
+
+class ZeebeError(Exception):
+
+    def __init__(self, err=None, rpc_error=None):
+        if err:
+            super().__init__(err)
+        if rpc_error:
+            self.code = rpc_error.code()
+            self.details = rpc_error.details()
+            self.debug = rpc_error.debug_error_string()
+            msg = f'{self.code}: {self.details}'
+            super().__init__(msg)
 
 
 @dataclass
@@ -68,50 +93,62 @@ def zboperation(fn):
     # wraps zeebe operations for ZeebeConnnections in a context manager
     # that handles auth / connection from the connection's ZeebeConfig
     def wrapper(*args, **kwargs):
-        inst = args[0]
-        try:
-            try:
-                if inst.config.is_secured:
-                    with grpc.secure_channel(
-                            *zb_connection_details(inst)) as channel:
-                        kwargs['channel'] = channel
-                        res = fn(*args, **kwargs)
-                        # this is important for job_iterator to work
-                        # without exiting the secure_channel context
-                        yield from res
-                else:
-                    with grpc.insecure_channel(inst.config.url) as channel:
-                        kwargs['channel'] = channel
-                        res = fn(*args, **kwargs)
-                        # this is important for job_iterator to work
-                        # without exiting the channel context
-                        yield from res
-            except (
-                requests.exceptions.HTTPError,
-                requests.exceptions.ConnectionError
-            ) as her:
-                # we have to catch this and re-raise as otherwise
-                # for some reason grpc._channel doesn't exist
-                raise her
-            except grpc._channel._InactiveRpcError:
-                # expired token
-                inst.credentials = None
-                if inst.config.is_secured:
-                    # get new credentials
-                    with grpc.secure_channel(
-                            *zb_connection_details(inst)) as channel:
-                        kwargs['channel'] = channel
-                        res = fn(*args, **kwargs)
-                        yield from res
-                else:
-                    with grpc.insecure_channel(inst.config.url) as channel:
-                        kwargs['channel'] = channel
-                        res = fn(*args, **kwargs)
-                        yield from res
+        inst: 'ZeebeConnection' = args[0]
+        yield from __zb_request_handler(inst, fn, args, kwargs)
 
-        except requests.exceptions.HTTPError as her:
-            raise her
     return wrapper
+
+
+def __zb_request_handler(
+    inst: 'ZeebeConnection',
+    fn: Callable,
+    args: List,
+    kwargs: Dict,
+    retry: int = 3
+):
+    '''
+        Create a secure channel for GRPC to be passed to the function that will use it.
+        If the operation fails due to the token being invalid (using secure channels)
+        Renew it a maximum of (retry) times.
+
+        Wraps raised ZeebeGRPC Errors in ZeebeError which is more readable && easier to deal with.
+    '''
+    retry -= 1
+    try:
+        if inst.config.is_secured:
+            with grpc.secure_channel(
+                    *zb_connection_details(inst)) as channel:
+                kwargs['channel'] = channel
+                yield from fn(*args, **kwargs)
+                # this is important for job_iterator to work
+                # without exiting the secure_channel context
+                # yield from res
+        else:
+            with grpc.insecure_channel(inst.config.url) as channel:
+                kwargs['channel'] = channel
+                yield from fn(*args, **kwargs)
+                # this is important for job_iterator to work
+                # without exiting the channel context
+                # yield from res
+    except (
+        requests.exceptions.HTTPError,
+        requests.exceptions.ConnectionError
+    ) as her:
+        # we have to catch this and re-raise as otherwise
+        # for some reason grpc._channel doesn't exist
+        raise her
+    except grpc._channel._InactiveRpcError as ier:
+        zbr = ZeebeError(rpc_error=ier)
+        if '401' not in zbr.details:
+            raise zbr from ier
+        else:
+            # token timed out
+            inst.credentials = None
+            if retry:
+                LOG.debug(f'retry {retry}')
+                yield from __zb_request_handler(inst, fn, args, kwargs, retry)
+            else:
+                raise zbr from ier
 
 
 class ZeebeConnection(object):
@@ -139,6 +176,26 @@ class ZeebeConnection(object):
                 workflows=[workflow]
             )
         )]
+
+    @zboperation
+    def send_message(
+        self,
+        message_id,
+        listener_name,
+        correlationKey=None,
+        ttl=600_000,  # 10 minute in mS
+        variables=None,
+        channel=None
+    ):
+        stub = gateway_pb2_grpc.GatewayStub(channel)
+        message = gateway_pb2.PublishMessageRequest(
+            messageId=message_id,
+            name=listener_name,
+            correlationKey=correlationKey,
+            timeToLive=ttl,
+            variables=json.dumps(variables) if variables else json.dumps({})
+        )
+        return [stub.PublishMessage(message)]
 
     @zboperation
     def create_instance(self, process_id, variables=None, version=1, channel=None):
@@ -169,5 +226,5 @@ class ZeebeConnection(object):
 
 def zb_connection_details(inst: ZeebeConnection):
     if not inst.credentials and inst.config.is_secured:
-        inst.credentials = get_credentials(inst.config)
+        inst.credentials = get_credentials(inst.config, bad_token='nasty')
     return [inst.config.url, inst.credentials]

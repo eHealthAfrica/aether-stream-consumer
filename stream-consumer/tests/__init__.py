@@ -130,6 +130,7 @@ def bad_zeebe_config():
     conf = ZeebeConfig(
         url=os.environ.get('ZEEBE_ADDRESS'),
         client_id=os.environ.get('ZEEBE_CLIENT_ID'),
+        # client_secret=os.environ.get('ZEEBE_CLIENT_SECRET'),
         client_secret='bad',
         audience=os.environ.get('ZEEBE_AUDIENCE'),
         token_url=os.environ.get('ZEEBE_AUTHORIZATION_SERVER_URL')
