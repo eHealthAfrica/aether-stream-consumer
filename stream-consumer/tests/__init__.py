@@ -211,6 +211,7 @@ def transformation_definitions():
 
     pairs = [
         ('zeebe', examples.ZEEBE_INSTANCE),
+        ('zeebemessage', examples.XF_ZEEBE_MESSAGE_REQUIRED),
         ('zeebespawn', examples.XF_ZEEBE_SPAWN_REQUIRED),
         ('zeebecomplete', examples.XF_ZEEBE_COMPLETE_REQUIRED),
         ('jscall', examples.XF_JS_ISODD),

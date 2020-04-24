@@ -159,6 +159,7 @@ class Job(BaseJob):
     _resources = [
         ZeebeInstance,
         transforms.ZeebeComplete,
+        transforms.ZeebeMessage,
         transforms.ZeebeSpawn,
         transforms.RestCall,
         transforms.JavascriptCall,

@@ -75,6 +75,11 @@ XF_ZEEBE_SPAWN_REQUIRED = {
     'name': 'Needs other vars',
 }
 
+XF_ZEEBE_MESSAGE_REQUIRED = {
+    'id': 'default',
+    'name': 'Needs other vars',
+}
+
 XF_ZEEBE_COMPLETE_REQUIRED = {
     'id': 'default',
     'name': 'only needs transitions'
@@ -302,6 +307,7 @@ PIPELINE_KAFKA = {
     'const': {
         'workflow': 'sort-flow',
         'single': 'single',
+        'message_listener': 'test_listener'
     },
     'stages': [
         {
@@ -344,6 +350,22 @@ PIPELINE_KAFKA = {
                 'output_map': {
                     'isOdd': '$.isOdd',
                     'message': '$.message'
+                }
+            }
+        },
+        {
+            'name': 'four',
+            'type': 'zeebemessage',
+            'id': 'default',
+            'transition': {
+                'input_map': {
+                    'message_id': '$.source.message.id',
+                    'listener_name': '$.const.message_listener',
+                    'mode': '$.const.single',
+                    'isOdd': '$.two.result'
+                },
+                'output_map': {
+                    'isOdd': '$.isOdd'
                 }
             }
         }
