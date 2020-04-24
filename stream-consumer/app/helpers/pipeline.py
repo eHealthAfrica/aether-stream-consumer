@@ -140,6 +140,7 @@ class PipelineContext(object):
         self.data: OrderedDict[str, Dict] = {}
         if isinstance(event, ZeebeJob):
             self.register_result('source', event.variables)
+            self.register_result('headers', event.headers)
         elif isinstance(event, TestEvent):
             self.register_result('source', {
                 k: event.get(k) for k in event.keys()

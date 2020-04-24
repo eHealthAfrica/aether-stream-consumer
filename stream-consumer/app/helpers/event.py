@@ -40,6 +40,7 @@ class TestEvent(Event, dict):
 class ZeebeJob(Event):
     def __init__(self, stub, job):
         self.key = job.key
+        self.headers = json.loads(job.customHeaders)
         self.variables = json.loads(job.variables)
         self.stub = stub
 
@@ -57,7 +58,8 @@ class ZeebeJob(Event):
         return {
             'key': self.key,
             'stub': 'NotSerializable',
-            'variables': self.variables
+            'variables': self.variables,
+            'headers': self.headers
         }
 
 

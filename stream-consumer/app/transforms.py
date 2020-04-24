@@ -145,10 +145,10 @@ class ZeebeSpawn(Transformation):
                                    ' a ZeebeConnection, found None')
             local_context = transition.prepare_input(context.data, self.definition)
             transition.check_failure(local_context)
-            for wf_name, inner_context in self._prepare_spawns(
+            for spawn in self._prepare_spawns(
                     mapping=transition.output_map,
                     **local_context):
-                self._handle_spawn(wf_name, inner_context, context.zeebe)
+                self._handle_spawn(context.zeebe, **spawn)
             return {'success': True}
         except Exception as err:
             raise TransformationError(err)
@@ -165,8 +165,11 @@ class ZeebeSpawn(Transformation):
     ) -> Iterable[Tuple[str, Dict]]:
         # returns (workflow, msg) generator
         if mode == 'single':
-            yield (workflow, Transition.apply_map(
-                mapping, local_context))
+            yield {
+                'workflow': workflow,
+                **Transition.apply_map(
+                    mapping, local_context)
+            }
         elif mode == 'multiple':
             if not message_iterator:
                 raise RuntimeError('Expected message_iterator in'
@@ -175,29 +178,111 @@ class ZeebeSpawn(Transformation):
                 CachedParser.find(message_iterator, local_context))
             for msg in res:
                 if message_destination:
-                    yield (workflow, {
+                    yield {
+                        'workflow': workflow,
                         **{message_destination: msg},
                         **Transition.apply_map(
                             mapping, local_context)
-                    })
+                    }
                 else:
-                    yield (workflow, {
+                    yield {
+                        'workflow': workflow,
                         **msg,
                         **Transition.apply_map(
                             mapping, local_context)
-                    })
+                    }
         else:
             raise RuntimeError(f'Expected mode in [single, multiple], got {mode}')
 
     def _handle_spawn(
         self,
-        wf_name: str,
-        local_context: Dict,
-        zeebe: ZeebeConnection
+        zeebe: ZeebeConnection,
+        workflow: str = None,
+        **local_context: Dict
     ):
-        res = next(zeebe.create_instance(wf_name, variables=local_context))
+
+        res = next(zeebe.create_instance(workflow, variables=local_context))
         LOG.debug(f'started even with {json.dumps(local_context)}')
         return {'result': res}
+
+
+# class ZeebeMessage(ZeebeSpawn):
+#     '''
+#     '''
+#     name = 'zeebemessage'
+#     single_requirements = [
+#         'workflow',
+#         'mode',
+#         'mapping'
+#     ]
+#     multiple_requirements = [
+#         'workflow',
+#         'mode',
+#         'message_iterator',
+#         'mapping'
+#     ]
+#     jobs_path = None
+
+#     # def run(self, context: PipelineContext, transition: Transition) -> Dict:
+#     #     try:
+#     #         if context.zeebe is None:
+#     #             raise RuntimeError('Expected pipeline context to have '
+#     #                                ' a ZeebeConnection, found None')
+#     #         local_context = transition.prepare_input(context.data, self.definition)
+#     #         transition.check_failure(local_context)
+#     #         for wf_name, inner_context in self._prepare_spawns(
+#     #                 mapping=transition.output_map,
+#     #                 **local_context):
+#     #             self._handle_spawn(wf_name, inner_context, context.zeebe)
+#     #         return {'success': True}
+#     #     except Exception as err:
+#     #         raise TransformationError(err)
+
+#     @check_required(['single_requirements', 'multiple_requirements'])
+#     def _prepare_spawns(
+#         self,
+#         mode=None,
+#         workflow=None,
+#         mapping=None,
+#         message_iterator=None,
+#         message_destination=None,
+#         **local_context
+#     ) -> Iterable[Tuple[str, Dict]]:
+#         # returns (workflow, msg) generator
+#         if mode == 'single':
+#             yield (workflow, Transition.apply_map(
+#                 mapping, local_context))
+#         elif mode == 'multiple':
+#             if not message_iterator:
+#                 raise RuntimeError('Expected message_iterator in'
+#                                    'mode `multiple` found None')
+#             res = Transition.handle_parser_results(
+#                 CachedParser.find(message_iterator, local_context))
+#             for msg in res:
+#                 if message_destination:
+#                     yield (workflow, {
+#                         **{message_destination: msg},
+#                         **Transition.apply_map(
+#                             mapping, local_context)
+#                     })
+#                 else:
+#                     yield (workflow, {
+#                         **msg,
+#                         **Transition.apply_map(
+#                             mapping, local_context)
+#                     })
+#         else:
+#             raise RuntimeError(f'Expected mode in [single, multiple], got {mode}')
+
+#     def _handle_spawn(
+#         self,
+#         wf_name: str,
+#         local_context: Dict,
+#         zeebe: ZeebeConnection
+#     ):
+#         res = next(zeebe.create_instance(wf_name, variables=local_context))
+#         LOG.debug(f'started even with {json.dumps(local_context)}')
+#         return {'result': res}
 
 
 class RestCall(Transformation):
