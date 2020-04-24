@@ -21,58 +21,24 @@
 from dataclasses import dataclass
 from dataclasses import field as DataClassField
 import json
-
 from typing import (
     Dict,
     Callable,
     List
 )
-
 import grpc
 import requests
 from zeebe_grpc import (
     gateway_pb2,
     gateway_pb2_grpc
 )
-
 from aet.logger import get_logger
-
 from .event import ZeebeJob
-
 
 LOG = get_logger('zb')
 
 
-class ZeebeError(Exception):
-
-    def __init__(self, err=None, rpc_error=None):
-        if err:
-            super().__init__(err)
-        if rpc_error:
-            self.code = rpc_error.code()
-            self.details = rpc_error.details()
-            self.debug = rpc_error.debug_error_string()
-            msg = f'{self.code}: {self.details}'
-            super().__init__(msg)
-
-
-@dataclass
-class ZeebeConfig:
-    url: str
-    client_id: str = None
-    client_secret: str = None
-    audience: str = None
-    token_url: str = None
-    is_secured: bool = DataClassField(init=False)
-
-    def __post_init__(self):
-        if not self.client_id:
-            self.is_secured = False
-        else:
-            self.is_secured = True
-
-
-def get_credentials(config: ZeebeConfig):
+def get_credentials(config: 'ZeebeConfig'):
     body = {
         'client_id': config.client_id,
         'client_secret': config.client_secret,
@@ -89,14 +55,10 @@ def get_credentials(config: ZeebeConfig):
     return composite_credentials
 
 
-def zboperation(fn):
-    # wraps zeebe operations for ZeebeConnnections in a context manager
-    # that handles auth / connection from the connection's ZeebeConfig
-    def wrapper(*args, **kwargs):
-        inst: 'ZeebeConnection' = args[0]
-        yield from __zb_request_handler(inst, fn, args, kwargs)
-
-    return wrapper
+def zb_connection_details(inst: 'ZeebeConnection'):
+    if not inst.credentials and inst.config.is_secured:
+        inst.credentials = get_credentials(inst.config)
+    return [inst.config.url, inst.credentials]
 
 
 def __zb_request_handler(
@@ -149,6 +111,45 @@ def __zb_request_handler(
                 yield from __zb_request_handler(inst, fn, args, kwargs, retry)
             else:
                 raise zbr from ier
+
+
+def zboperation(fn):
+    # wraps zeebe operations for ZeebeConnnections in a context manager
+    # that handles auth / connection from the connection's ZeebeConfig
+    def wrapper(*args, **kwargs):
+        inst: 'ZeebeConnection' = args[0]
+        yield from __zb_request_handler(inst, fn, args, kwargs)
+
+    return wrapper
+
+
+class ZeebeError(Exception):
+
+    def __init__(self, err=None, rpc_error=None):
+        if err:
+            super().__init__(err)
+        if rpc_error:
+            self.code = rpc_error.code()
+            self.details = rpc_error.details()
+            self.debug = rpc_error.debug_error_string()
+            msg = f'{self.code}: {self.details}'
+            super().__init__(msg)
+
+
+@dataclass
+class ZeebeConfig:
+    url: str
+    client_id: str = None
+    client_secret: str = None
+    audience: str = None
+    token_url: str = None
+    is_secured: bool = DataClassField(init=False)
+
+    def __post_init__(self):
+        if not self.client_id:
+            self.is_secured = False
+        else:
+            self.is_secured = True
 
 
 class ZeebeConnection(object):
@@ -222,9 +223,3 @@ class ZeebeConnection(object):
         for response in activate_jobs_response:
             for job in response.jobs:
                 yield ZeebeJob(stub, job)
-
-
-def zb_connection_details(inst: ZeebeConnection):
-    if not inst.credentials and inst.config.is_secured:
-        inst.credentials = get_credentials(inst.config, bad_token='nasty')
-    return [inst.config.url, inst.credentials]
