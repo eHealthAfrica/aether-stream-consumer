@@ -1,0 +1,43 @@
+version: "2.1"
+services:
+
+  consumer-test:
+    extends:
+      file: docker-compose-base.yml
+      service: stream-consumer
+    environment:
+      # consumer settings
+      CONSUMER_NAME: 'STREAM-TEST'
+      TENANCY_HEADER: x-oauth-realm
+      # redis
+      REDIS_PASSWORD: password
+      # kafka settings
+      KAFKA_CONFIG_PATH: /code/conf/consumer/kafka.json
+      KAFKA_URL: ${KAFKA_URL}
+      SECURITY.PROTOCOL: SASL_SSL
+      SASL.MECHANISM: PLAIN
+      SASL.USERNAME: ${KAFKA_SASL_USERNAME}
+      SASL.PASSWORD: ${KAFKA_SASL_PASSWORD}
+
+      # TEST Zeebe instance
+      ZEEBE_ADDRESS: zeebe:26500
+      # ZEEBE_ADDRESS: ${ZEEBE_ADDRESS}
+      # ZEEBE_AUDIENCE: ${ZEEBE_AUDIENCE}
+      # ZEEBE_CLIENT_ID: ${ZEEBE_CLIENT_ID}
+      # ZEEBE_CLIENT_SECRET: ${ZEEBE_CLIENT_SECRET}
+      # ZEEBE_AUTHORIZATION_SERVER_URL: ${ZEEBE_AUTHORIZATION_SERVER_URL}
+
+  zeebe:
+    container_name: zeebe_broker
+    image: camunda/zeebe:0.23.0
+    environment:
+      - ZEEBE_LOG_LEVEL=debug
+    volumes:
+      - ./lib/zeebe-hazelcast-exporter-0.8.0-jar-with-dependencies.jar:/usr/local/zeebe/exporters/zeebe-hazelcast-exporter.jar
+      - ./conf/application.yaml:/usr/local/zeebe/config/application.yaml
+
+  redis:
+    image: redis:alpine
+    command: >
+      redis-server
+      --requirepass password

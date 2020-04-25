@@ -1,0 +1,24 @@
+#################################################################################################
+#                                                                              					#
+#                             Primary requirements                             					#
+#                                                                              					#
+#                                 CHANGE ME !!!                                					#
+#                                                                              					#
+# Update me and then run 'docker-compose run myconsumer pip_freeze'                             #
+#                                                                              					#
+#################################################################################################
+
+# Consumer
+aet.consumer
+aether.python
+dnspython
+quickjs
+requests
+zeebe_grpc
+
+# Tests
+flake8
+mock
+pytest
+pytest-runner
+responses
