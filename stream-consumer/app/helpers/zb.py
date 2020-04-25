@@ -32,10 +32,10 @@ from zeebe_grpc import (
     gateway_pb2,
     gateway_pb2_grpc
 )
-from aet.logger import get_logger
+# from aet.logger import get_logger
 from .event import ZeebeJob
 
-LOG = get_logger('zb')
+# LOG = get_logger('zb')
 
 
 def get_credentials(config: 'ZeebeConfig'):
@@ -107,7 +107,6 @@ def __zb_request_handler(
             # token timed out
             inst.credentials = None
             if retry:
-                LOG.debug(f'retry {retry}')
                 yield from __zb_request_handler(inst, fn, args, kwargs, retry)
             else:
                 raise zbr from ier
@@ -165,7 +164,12 @@ class ZeebeConnection(object):
         return [topology]
 
     @zboperation
-    def deploy_workflow(self, process_id, definition, channel=None):
+    def deploy_workflow(
+        self,
+        process_id,
+        definition,
+        channel=None
+    ):
         stub = gateway_pb2_grpc.GatewayStub(channel)
         workflow = gateway_pb2.WorkflowRequestObject(
             name=process_id,
@@ -199,15 +203,26 @@ class ZeebeConnection(object):
         return [stub.PublishMessage(message)]
 
     @zboperation
-    def create_instance(self, process_id, variables=None, version=1, channel=None):
+    def create_instance(
+        self,
+        process_id,
+        variables=None,
+        version=1,
+        channel=None
+    ):
         stub = gateway_pb2_grpc.GatewayStub(channel)
-        return [stub.CreateWorkflowInstance(
+        res = stub.CreateWorkflowInstance(
             gateway_pb2.CreateWorkflowInstanceRequest(
                 bpmnProcessId=process_id,
                 version=version,
                 variables=json.dumps(variables) if variables else json.dumps({})
             )
-        )]
+        )
+        # make object json serializable
+        return [{
+            k: getattr(res, k) for k in
+            ['bpmnProcessId', 'version', 'workflowInstanceKey', 'workflowKey']
+        }]
 
     @zboperation
     def job_iterator(self, _type, worker_name, timeout=30, max=1, channel=None):

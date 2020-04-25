@@ -38,6 +38,7 @@ from aet.resource import BaseResource, lock  # noqa
 from app import transforms
 from app.config import get_consumer_config, get_kafka_config
 from app.fixtures import schemas
+from app.helpers import check_required, TransformationError
 from app.helpers.event import (
     TestEvent,
 )
@@ -66,7 +67,18 @@ class ZeebeInstance(BaseResource):
     jobs_path = None
     name = 'zeebe'
     public_actions = BaseResource.public_actions + [
-        'test'
+        'test',
+        'send_message',
+        'start_workflow'
+    ]
+
+    _message_requires = [
+        'message_id',
+        'listener_name'
+    ]
+
+    _workflow_requires = [
+        'process_id'
     ]
 
     def _on_init(self):
@@ -89,6 +101,77 @@ class ZeebeInstance(BaseResource):
     def test(self, *args, **kwargs):
         res = next(self.get_connection().get_topology())
         return res.brokers is not None
+
+    @check_required('_message_requires')
+    def _send_message(
+        self,
+        message_id,
+        listener_name,
+        correlationKey=None,
+        ttl=600_000,  # 10 minute in mS
+        variables=None,
+        **kwargs  # grab any extras and ignore them
+    ):
+        res = next(self.get_connection().send_message(
+            message_id, listener_name, correlationKey, ttl, variables
+        ))
+        if not (type(res).__name__ == 'PublishMessageResponse'):
+            raise TransformationError(f'Message {message_id} received unknown response')
+        return True
+
+    # public!
+    def send_message(self, request=None, *args, **kwargs):
+        '''
+        as a POST
+        message_id, (required)
+        listener_name, (required)
+        correlationKey=None,
+        ttl=600_000,  # in mS
+        variables=None,  # the message
+        '''
+        try:
+            if isinstance(request, LocalProxy):
+                message = request.get_json()
+            elif 'json_body' in kwargs:
+                message = kwargs.get('json_body')
+            else:
+                raise ConsumerHttpException('Test Method expects a JSON Post', 400)
+            return self._send_message(**message)
+        except Exception as err:
+            raise ConsumerHttpException(err, 400)
+
+    @check_required('_workflow_requires')
+    def _start_workflow(
+        self,
+        process_id,
+        variables=None,
+        version=1,
+        **kwargs
+    ):
+        res = next(self.get_connection().create_instance(
+            process_id, variables, version
+        ))
+        return res
+
+    # public!
+    def start_workflow(self, request=None, *args, **kwargs):
+        '''
+        as a POST
+        process_id, (required)
+        variables=None, # the Body
+        version=None,
+        '''
+        try:
+            if isinstance(request, LocalProxy):
+                message = request.get_json()
+            elif 'json_body' in kwargs:
+                message = kwargs.get('json_body')
+            else:
+                raise ConsumerHttpException('Test Method expects a JSON Post', 400)
+            res = self._start_workflow(**message)
+            return res
+        except Exception as err:
+            raise ConsumerHttpException(err, 400)
 
 
 class Pipeline(BaseResource):
@@ -113,7 +196,7 @@ class Pipeline(BaseResource):
             self.definition,
             self._zb()
         )
-        LOG.critical(f'Prepared Pipeline {self.id}')
+        LOG.debug(f'Prepared Pipeline {self.id}')
 
     def _zb(self):
         if 'zeebe_instance' in self.definition:

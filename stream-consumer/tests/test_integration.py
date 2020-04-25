@@ -89,12 +89,6 @@ def test__zb_connection(
 
 
 @pytest.mark.parametrize('ep,artifact', [
-    # ('zeebe', ),
-    # ('zeebecomplete', ),
-    # ('zeebespawn', ),
-    # ('restcall', ),
-    # ('jscall', ),
-    # ('pipeline', ),
     ('zeebe', examples.ZEEBE_INSTANCE),
     ('jscall', examples.XF_JS_ADDER),
     ('jscall', examples.XF_JS_TYPED_ADDER),
@@ -110,6 +104,54 @@ def test__api_add_resources(StreamConsumer, RequestClientT1, ep, artifact):
     assert(doc_id in res.json())
     res = RequestClientT1.get(f'{URL}/{ep}/get?id={doc_id}')
     assert(doc_id == res.json()['id'])
+
+
+@pytest.mark.parametrize('ep,id,artifact,result_field,result,error', [
+    ('zeebe/test', 'default', {},None, True, None),
+    ('zeebe/send_message', 'default', {  # missing fields
+        'missing': 'id'
+    }, None, None, 400),
+    ('zeebe/send_message', 'default', {
+        'message_id': 'a_message',
+        'listener_name': 'a_listener',
+    }, None, True, None),
+    ('zeebe/send_message', 'default', {  # duplicate messages rejected
+        'message_id': 'a_message',
+        'listener_name': 'a_listener',
+    }, None, None, 400),
+    ('zeebe/start_workflow', 'default', {
+        'process_id': 'echo-flow',
+        'variables': {}
+    }, 'bpmnProcessId', 'echo-flow', None),
+    ('zeebe/start_workflow', 'default', {
+        'process_id': 'echo-flow'
+    }, 'bpmnProcessId', 'echo-flow', None),
+    ('zeebe/start_workflow', 'default', {  # unknown version
+        'process_id': 'echo-flow',
+        'version': 0,
+        'variables': {}
+    }, None, None, 400),
+    ('zeebe/start_workflow', 'default', {  # unknown wf
+        'process_id': 'unknown',
+        'variables': {}
+    }, None, None, 400),
+])
+@pytest.mark.integration
+def test__api_zeebe_calls(StreamConsumer, RequestClientT1, ep, id, artifact, result_field, result, error):  # noqa
+    res = RequestClientT1.post(f'{URL}/{ep}?id={id}', json=artifact)
+    if not error:
+        LOG.debug(res.text)
+        res.raise_for_status()
+        body = res.json()
+        if not result_field:
+            assert(body == result)
+        else:
+            assert(body[result_field] == result)
+    else:
+        with pytest.raises(HTTPError):
+            res.raise_for_status()
+        LOG.debug(res.text)
+        assert(res.status_code == error)
 
 
 @pytest.mark.parametrize('_id,body,result_field,result_value,error', [
@@ -142,7 +184,7 @@ def test__pipeline_wait_for_resource_init(
     StreamConsumer,
     RequestClientT1
 ):
-    sleep(2)
+    sleep(3)
 
 
 @pytest.mark.parametrize('_id,body,result_field,result_value,error', [
