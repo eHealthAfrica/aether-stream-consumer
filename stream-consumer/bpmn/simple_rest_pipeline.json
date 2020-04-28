@@ -1,0 +1,40 @@
+{
+    "id": "rest_handler",
+    "zeebe_instance": "default",
+    "zeebe_subscription": "rest-worker",
+    "stages": [
+        {
+            "name": "one",
+            "type": "restcall",
+            "id": "default",
+            "transition": {
+                "input_map": {
+                    "url": "$.source.url",
+                    "method": "$.source.method",
+                    "headers": "$.source.headers",
+                    "token": "$.source.token",
+                    "basic_auth": "$.source.basic_auth",
+                    "query_params": "$.source.query_params",
+                    "json_body": "$.source.json_body"
+                },
+                "output_map": {
+                    "status_code": "$.status_code",
+                    "json": "$.json"
+                }
+            }
+        },
+        {
+            "name": "two",
+            "type": "zeebecomplete",
+            "id": "default",
+            "transition": {
+                "input_map": {
+                    "status_code": "$.one.status_code",
+                    "json": "$.one.json",
+                    "text": "$.one.text"
+                },
+                "fail_condition": "$.one.request_failed"
+            }
+        }
+    ]
+}
