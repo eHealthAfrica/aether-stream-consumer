@@ -18,7 +18,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import pydoc
 import quickjs
 import requests
 
@@ -33,7 +32,7 @@ from typing import (  # noqa
 )
 
 from aet.resource import ResourceDefinition
-from . import TransformationError
+from . import TransformationError, type_checker
 
 
 class JSHelper(object):
@@ -59,25 +58,8 @@ class JSHelper(object):
                         '''
         self._function = quickjs.Function(definition.entrypoint, script)
 
-    def __type_checker(self, name, _type):
-        if _type:
-            _type = pydoc.locate(_type)
-
-            def _fn(obj) -> bool:
-                if not isinstance(obj, _type):
-                    raise TypeError(
-                        f'Expected {name} to be of type "{_type.__name__}",'
-                        f' Got "{type(obj).__name__}"')
-                return True
-            return _fn
-        else:
-            # no checking if _type is null
-            def _fn(obj):
-                return True
-            return _fn
-
     def __make_type_checkers(self, args: Dict[str, str]) -> Dict[str, Callable]:
-        return {name: self.__type_checker(name, _type) for name, _type in args.items()}
+        return {name: type_checker(name, _type) for name, _type in args.items()}
 
     def _make_argument_parser(self, args: Union[List[str], Dict[str, str]]):
         # TODO make type aware

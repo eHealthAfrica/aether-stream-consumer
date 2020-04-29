@@ -18,7 +18,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# import json  # noqa
 from functools import partial
 from time import sleep
 from typing import (
@@ -72,14 +71,14 @@ class ZeebeInstance(BaseResource):
         'start_workflow'
     ]
 
-    _message_requires = [
-        'message_id',
-        'listener_name'
-    ]
+    _message_requires = {
+        # 'message_id': 'str',
+        'listener_name': 'str'
+    }
 
-    _workflow_requires = [
-        'process_id'
-    ]
+    _workflow_requires = {
+        'process_id': 'str'
+    }
 
     def _on_init(self):
         d = self.definition
@@ -105,15 +104,15 @@ class ZeebeInstance(BaseResource):
     @check_required('_message_requires')
     def _send_message(
         self,
-        message_id,
         listener_name,
+        message_id=None,
         correlationKey=None,
         ttl=600_000,  # 10 minute in mS
         variables=None,
         **kwargs  # grab any extras and ignore them
     ):
         res = next(self.get_connection().send_message(
-            message_id, listener_name, correlationKey, ttl, variables
+            listener_name, message_id, correlationKey, ttl, variables
         ))
         if not (type(res).__name__ == 'PublishMessageResponse'):
             raise TransformationError(f'Message {message_id} received unknown response')
@@ -267,7 +266,7 @@ class Job(BaseJob):
 
     def _get_messages(self, config):
         try:
-            pls: List[Pipeline] = self._job_pipelines()
+            pls: List[Pipeline] = self._job_pipelines(config)
             for pl in pls:
                 completed = 0
                 ok = 0

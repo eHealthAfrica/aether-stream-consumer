@@ -66,11 +66,14 @@ class RestHelper(object):
             try:
                 data['json'] = res.json()
             except Exception:
-                pass
+                data['json'] = None
             data['headers'] = {k: v for k, v in data.get('headers', {}).items()}
+            data['request_failed'] = False
             return data
         except requests.exceptions.HTTPError as her:
-            return {f: getattr(her.response, f) for f in cls.failure_keys}
+            data = {f: getattr(her.response, f) for f in cls.failure_keys}
+            data['request_failed'] = True
+            return data
 
     @classmethod
     def request_type(cls, name: str):
