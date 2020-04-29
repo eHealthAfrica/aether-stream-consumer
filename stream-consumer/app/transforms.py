@@ -278,7 +278,7 @@ class ZeebeMessage(ZeebeSpawn):
     ):
         # Doesn't return anything useful
         res = next(zeebe.send_message(
-            message_id, listener_name, correlationKey, ttl, variables=local_context)
+            listener_name, message_id, correlationKey, ttl, variables=local_context)
         )
         if not (type(res).__name__ == 'PublishMessageResponse'):
             raise TransformationError(f'Message {message_id} received unknown response')

@@ -72,7 +72,7 @@ class ZeebeInstance(BaseResource):
     ]
 
     _message_requires = {
-        'message_id': 'str',
+        # 'message_id': 'str',
         'listener_name': 'str'
     }
 
@@ -104,15 +104,15 @@ class ZeebeInstance(BaseResource):
     @check_required('_message_requires')
     def _send_message(
         self,
-        message_id,
         listener_name,
+        message_id=None,
         correlationKey=None,
         ttl=600_000,  # 10 minute in mS
         variables=None,
         **kwargs  # grab any extras and ignore them
     ):
         res = next(self.get_connection().send_message(
-            message_id, listener_name, correlationKey, ttl, variables
+            listener_name, message_id, correlationKey, ttl, variables
         ))
         if not (type(res).__name__ == 'PublishMessageResponse'):
             raise TransformationError(f'Message {message_id} received unknown response')

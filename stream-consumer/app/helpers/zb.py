@@ -185,8 +185,8 @@ class ZeebeConnection(object):
     @zboperation
     def send_message(
         self,
-        message_id,
         listener_name,
+        message_id=None,
         correlationKey=None,
         ttl=600_000,  # 10 minute in mS
         variables=None,
