@@ -202,7 +202,6 @@ class ZeebeSpawn(Transformation):
     ):
 
         res = next(zeebe.create_instance(workflow, variables=local_context))
-        LOG.debug(f'started even with {json.dumps(local_context)}')
         return {'result': res}
 
 

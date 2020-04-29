@@ -264,7 +264,6 @@ class PipelinePubSub(object):
             jobs = self.zeebe_connection.job_iterator(workflow_id, self.kafka_group_id, max=50)
             c = 0
             for job in jobs:
-                LOG.debug(f'got job: {json.dumps(job)}')
                 c += 1
                 yield job
             LOG.debug(f'No more jobs available on {workflow_id}, got {c}')
@@ -351,9 +350,7 @@ class PipelineSet(object):
         raise_errors=True
     ):
         try:
-            # LOG.debug(f'{stage.name} Context : {json.dumps(context.data, indent=2)}')
             result = stage.run(context)
-            # LOG.debug(f'{stage.name} Result : {json.dumps(result, indent=2)}')
             context.register_result(stage.name, result)
         except TransformationError as ter:
             if raise_errors:

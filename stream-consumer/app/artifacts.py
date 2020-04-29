@@ -278,7 +278,6 @@ class Job(BaseJob):
                         if res[0] is True:
                             ok += 1
                         else:
-                            self.log.debug(res[1])
                             failed += 1
 
                     self.log.debug(f'Pipeline: {pl.id} did work: ok/failed/total ='
