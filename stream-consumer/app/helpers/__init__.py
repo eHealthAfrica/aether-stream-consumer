@@ -22,10 +22,6 @@ from inspect import isclass
 import pydoc
 
 
-from aet.logger import get_logger
-LOG = get_logger('HLP')
-
-
 class TransformationError(Exception):
     pass
 
@@ -43,7 +39,6 @@ def type_checker(name, _type):
             return True
         return _fn
     else:
-        LOG.debug(f'No type for {_type}')
 
         # no checking if _type is null
         def _fn(obj):
@@ -73,7 +68,6 @@ def check_required(class_fields):
                                 failed.append(str(ter))
                 if missing:
                     failed.append(f'Expected required fields, missing {missing}')
-                LOG.debug(failed)
 
             if len(failed) >= len(fields):
                 raise RuntimeError(f'And '.join(failed))
