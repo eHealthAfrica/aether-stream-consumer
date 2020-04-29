@@ -18,9 +18,37 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from inspect import isclass
+import pydoc
+
+
+from aet.logger import get_logger
+LOG = get_logger('HLP')
+
 
 class TransformationError(Exception):
     pass
+
+
+def type_checker(name, _type):
+    _type = pydoc.locate(_type)
+    if not isclass(_type):
+        _type = None
+    if _type:
+        def _fn(obj) -> bool:
+            if not isinstance(obj, _type):
+                raise TypeError(
+                    f'Expected {name} to be of type "{_type.__name__}",'
+                    f' Got "{type(obj).__name__}"')
+            return True
+        return _fn
+    else:
+        LOG.debug(f'No type for {_type}')
+
+        # no checking if _type is null
+        def _fn(obj):
+            return True
+        return _fn
 
 
 def check_required(class_fields):
@@ -30,9 +58,23 @@ def check_required(class_fields):
             failed = []
             for field in fields:
                 required = getattr(args[0], field)
-                missing = [i for i in required if kwargs.get(i) is None]
+                missing = []
+                if isinstance(required, list):
+                    missing = [i for i in required if kwargs.get(i) is None]
+                elif isinstance(required, dict):
+                    for name, expected_type in required.items():
+                        value = kwargs.get(name)
+                        if value is None:
+                            missing.append(name)
+                        else:
+                            try:
+                                type_checker(name, expected_type)(value)
+                            except TypeError as ter:
+                                failed.append(str(ter))
                 if missing:
                     failed.append(f'Expected required fields, missing {missing}')
+                LOG.debug(failed)
+
             if len(failed) >= len(fields):
                 raise RuntimeError(f'And '.join(failed))
             return f(*args, **kwargs)
