@@ -95,8 +95,8 @@ class ZeebeComplete(Transformation):
         Uses input_map to prepare output for job.
         Completes job
     '''
-    schema = schemas.BASIC
     name = 'zeebecomplete'
+    schema = schemas.BASIC
 
     def run(self, context: PipelineContext, transition: Transition) -> Dict:
         input_context = context.data
@@ -124,13 +124,14 @@ class ZeebeSpawn(Transformation):
     '''
     '''
     name = 'zeebespawn'
+    schema = schemas.BASIC
     single_requirements = [
-        'workflow',
+        'process_id',
         'mode',
         'mapping'
     ]
     multiple_requirements = [
-        'workflow',
+        'process_id',
         'mode',
         'message_iterator',
         'mapping'
@@ -156,7 +157,7 @@ class ZeebeSpawn(Transformation):
     def _prepare_spawns(
         self,
         mode=None,
-        workflow=None,
+        process_id=None,
         mapping=None,
         message_iterator=None,
         message_destination=None,
@@ -165,7 +166,7 @@ class ZeebeSpawn(Transformation):
         # returns (workflow, msg) generator
         if mode == 'single':
             yield {
-                'workflow': workflow,
+                'process_id': process_id,
                 **Transition.apply_map(
                     mapping, local_context)
             }
@@ -178,14 +179,14 @@ class ZeebeSpawn(Transformation):
             for msg in res:
                 if message_destination:
                     yield {
-                        'workflow': workflow,
+                        'process_id': process_id,
                         **{message_destination: msg},
                         **Transition.apply_map(
                             mapping, local_context)
                     }
                 else:
                     yield {
-                        'workflow': workflow,
+                        'process_id': process_id,
                         **msg,
                         **Transition.apply_map(
                             mapping, local_context)
@@ -196,11 +197,11 @@ class ZeebeSpawn(Transformation):
     def _handle_spawn(
         self,
         zeebe: ZeebeConnection,
-        workflow: str = None,
+        process_id: str = None,
         **local_context: Dict
     ):
 
-        res = next(zeebe.create_instance(workflow, variables=local_context))
+        res = next(zeebe.create_instance(process_id, variables=local_context))
         return {'result': res}
 
 
@@ -208,6 +209,7 @@ class ZeebeMessage(ZeebeSpawn):
     '''
     '''
     name = 'zeebemessage'
+    schema = schemas.BASIC
     s_requirements = [
         'mode',
         'message_id',
@@ -284,8 +286,8 @@ class ZeebeMessage(ZeebeSpawn):
 
 
 class RestCall(Transformation):
-    schema = schemas.PERMISSIVE
     name = 'restcall'
+    schema = schemas.BASIC
     jobs_path = None
 
     def _on_init(self):
@@ -296,7 +298,7 @@ class RestCall(Transformation):
 
 
 class JavascriptCall(Transformation):
-    schema = schemas.PERMISSIVE
+    schema = schemas.JS_CALL
     name = 'jscall'
     jobs_path = None
 
