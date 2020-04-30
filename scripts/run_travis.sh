@@ -20,5 +20,7 @@
 #
 set -Eeuo pipefail
 
-scripts/run_unit_tests.sh
-scripts/run_integration_tests.sh
+docker-compose -f docker-compose-test.yml up -d redis zeebe
+docker-compose -f docker-compose-test.yml build >> /dev/null
+docker-compose -f docker-compose-test.yml run consumer-test test_unit
+docker-compose -f docker-compose-test.yml run consumer-test test_integration
