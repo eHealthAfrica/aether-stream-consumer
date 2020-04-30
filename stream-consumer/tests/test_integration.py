@@ -70,10 +70,9 @@ def test__broker_send_message(zeebe_connection):
 @pytest.mark.integration
 def test__deploy_workflow(zeebe_connection, bpmn_echo, bpmn_sort):
     res = next(zeebe_connection.deploy_workflow('echo-flow', bpmn_echo))
-    LOG.critical(res)
+    assert(res is not None)  # raises ZeebeError
     res = next(zeebe_connection.deploy_workflow('sort-flow', bpmn_sort))
-    LOG.critical(res)
-
+    assert(res is not None)  # raises ZeebeError
 
 @pytest.mark.integration
 def test__start(StreamConsumer):
@@ -203,7 +202,6 @@ def test__pipeline_adder_test(
 ):
     res = RequestClientT1.post(f'{URL}/pipeline/test?id={_id}', json=body)
     if not error:
-        LOG.critical(res.text)
         res.raise_for_status()
         body = res.json()
         assert(body.get(result_field) == result_value)
@@ -284,7 +282,6 @@ def test__do_some_work(zeebe_connection):
             LOG.debug(job.variables)
         except Exception as aer:
             LOG.error(job.variables)
-            LOG.critical(aer)
 
 
 @pytest.mark.integration
