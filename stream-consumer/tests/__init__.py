@@ -22,6 +22,7 @@
 import json
 import pytest
 import os
+from time import sleep
 from uuid import uuid4
 # from unittest.mock import patch
 
@@ -49,7 +50,7 @@ from aether.python.avro import generation
 from app import config, consumer
 from app.artifacts import Job
 
-from app.helpers.zb import ZeebeConfig, ZeebeConnection
+from app.helpers.zb import ZeebeConfig, ZeebeConnection, ZeebeError
 from app.helpers.pipeline import Transition
 
 from app.fixtures import examples
@@ -191,6 +192,24 @@ def create_remote_kafka_assets(request, sample_generator, *args):
         yield None  # end of work before clean-up
         LOG.debug(f'deleting topic: {new_topic}')
         delete_topic(kadmin, new_topic)
+
+
+@pytest.fixture(scope='session', autouse=True)
+def zeebe_broker_is_ready(request, zeebe_connection, *args):
+    # @mark annotation does not work with autouse=True.
+    if 'integration' not in request.config.invocation_params.args:
+        LOG.debug(f'NOT waiting for broker')
+        yield None
+    else:
+        LOG.debug(f'connecting to Zeebe')
+        for x in range(30):
+            res = next(zeebe_connection.get_topology())
+            try:
+                assert(res.brokers is not None)
+                break
+            except (AssertionError, ZeebeError):
+                sleep(1)
+        yield None
 
 
 @pytest.mark.unit

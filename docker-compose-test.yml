@@ -26,6 +26,9 @@ services:
       # ZEEBE_CLIENT_ID: ${ZEEBE_CLIENT_ID}
       # ZEEBE_CLIENT_SECRET: ${ZEEBE_CLIENT_SECRET}
       # ZEEBE_AUTHORIZATION_SERVER_URL: ${ZEEBE_AUTHORIZATION_SERVER_URL}
+    depends_on:
+      - zeebe
+      - redis
 
   zeebe:
     container_name: zeebe_broker

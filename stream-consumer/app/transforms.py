@@ -18,7 +18,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import json
 from typing import (
     Dict,
     Iterable,
@@ -50,7 +49,7 @@ LOG = get_logger('transformers')
 
 
 class Transformation(BaseResource):
-    schema = schemas.PERMISSIVE
+    schema = schemas.BASIC
     name = '__transformation'  # should not be directly created...
     jobs_path = None
 
@@ -96,7 +95,7 @@ class ZeebeComplete(Transformation):
         Uses input_map to prepare output for job.
         Completes job
     '''
-    schema = schemas.PERMISSIVE
+    schema = schemas.BASIC
     name = 'zeebecomplete'
 
     def run(self, context: PipelineContext, transition: Transition) -> Dict:

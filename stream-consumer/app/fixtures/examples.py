@@ -242,7 +242,7 @@ REST_STAGE = {
 ZEEBE_JOB = {
     'id': 'zeebe-default',
     'name': 'Default Stream Consumer Job',
-    'pipeline': 'default'
+    'pipelines': ['default']
 }
 
 
