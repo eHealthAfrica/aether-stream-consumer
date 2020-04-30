@@ -125,12 +125,12 @@ class ZeebeSpawn(Transformation):
     '''
     name = 'zeebespawn'
     single_requirements = [
-        'workflow',
+        'process_id',
         'mode',
         'mapping'
     ]
     multiple_requirements = [
-        'workflow',
+        'process_id',
         'mode',
         'message_iterator',
         'mapping'
@@ -156,16 +156,16 @@ class ZeebeSpawn(Transformation):
     def _prepare_spawns(
         self,
         mode=None,
-        workflow=None,
+        process_id=None,
         mapping=None,
         message_iterator=None,
         message_destination=None,
         **local_context
     ) -> Iterable[Tuple[str, Dict]]:
-        # returns (workflow, msg) generator
+        # returns (process_id, msg) generator
         if mode == 'single':
             yield {
-                'workflow': workflow,
+                'process_id': process_id,
                 **Transition.apply_map(
                     mapping, local_context)
             }
@@ -178,14 +178,14 @@ class ZeebeSpawn(Transformation):
             for msg in res:
                 if message_destination:
                     yield {
-                        'workflow': workflow,
+                        'process_id': process_id,
                         **{message_destination: msg},
                         **Transition.apply_map(
                             mapping, local_context)
                     }
                 else:
                     yield {
-                        'workflow': workflow,
+                        'process_id': process_id,
                         **msg,
                         **Transition.apply_map(
                             mapping, local_context)
@@ -196,11 +196,11 @@ class ZeebeSpawn(Transformation):
     def _handle_spawn(
         self,
         zeebe: ZeebeConnection,
-        workflow: str = None,
+        process_id: str = None,
         **local_context: Dict
     ):
 
-        res = next(zeebe.create_instance(workflow, variables=local_context))
+        res = next(zeebe.create_instance(process_id, variables=local_context))
         return {'result': res}
 
 
