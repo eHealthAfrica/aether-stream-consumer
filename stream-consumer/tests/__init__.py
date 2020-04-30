@@ -203,8 +203,8 @@ def zeebe_broker_is_ready(request, zeebe_connection, *args):
     else:
         LOG.debug(f'connecting to Zeebe')
         for x in range(30):
-            res = next(zeebe_connection.get_topology())
             try:
+                res = next(zeebe_connection.get_topology())
                 assert(res.brokers is not None)
                 break
             except (AssertionError, ZeebeError):

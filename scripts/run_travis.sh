@@ -1,3 +1,5 @@
+#!/bin/bash
+#
 # Copyright (C) 2018 by eHealth Africa : http://www.eHealthAfrica.org
 #
 # See the NOTICE file distributed with this work for additional information
@@ -15,34 +17,8 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+#
+set -Eeuo pipefail
 
-[aliases]
-test=pytest
-
-[flake8]
-max-line-length = 100
-ignore =
-        F403,
-        F405
-exclude =
-    /code/./.eggs/*
-    */__pycache__/*
-
-[metadata]
-description-file = README.md
-
-
-[tool:pytest]
-python_files = tests/test*.py
-addopts = --maxfail=1 --capture=no -p no:warnings --cov-report term-missing --cov=app --cov-append -p no:cacheprovider
-markers =
-    unit: Unit Tests
-    integration: Integration Tests
-filterwarnings =
-    ignore::UserWarning
-    ignore::urllib3.exceptions.InsecureRequestWarning
-# For super verbose tests...
-# log_cli = 1
-# log_cli_level = DEBUG
-# log_cli_format = %(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)
-# log_cli_date_format=%Y-%m-%d %H:%M:%S
+scripts/run_unit_tests.sh || true
+scripts/run_integration_tests.sh || true
