@@ -29,7 +29,7 @@ set -Eeuo pipefail
 
 # Build docker images
 IMAGE_REPO='ehealthafrica'
-CORE_APPS=( stream-consumer )
+CORE_APPS=( consumer )
 CORE_COMPOSE='docker-compose.yml'
 VERSION=$TRAVIS_TAG
 
@@ -37,7 +37,7 @@ VERSION=$TRAVIS_TAG
 release_app () {
   APP_NAME=$1
   COMPOSE_PATH=$2
-  AETHER_APP="aether-${1}"
+  AETHER_APP="aether-stream-${1}"
   echo "$AETHER_APP"
   echo "version: $VERSION"
   echo "Building Docker image ${IMAGE_REPO}/${AETHER_APP}:${VERSION}"
