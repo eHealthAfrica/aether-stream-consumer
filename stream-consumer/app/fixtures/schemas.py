@@ -71,6 +71,105 @@ BASIC = '''
 }
 '''
 
+JS_CALL = '''
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "$id": "http://example.com/example.json",
+    "type": "object",
+    "title": "Basic Requirements",
+    "description": "The Minimum required for any Consumer Resource",
+    "default": {},
+    "additionalProperties": true,
+    "required": [
+        "id",
+        "name",
+        "arguments",
+        "entrypoint"
+    ],
+    "properties": {
+        "id": {
+            "$id": "#/properties/id",
+            "type": "string",
+            "title": "ID",
+            "description": "The ID used to reference the instance",
+            "default": "",
+            "examples": [
+                "default"
+            ]
+        },
+        "name": {
+            "$id": "#/properties/name",
+            "type": "string",
+            "title": "Name",
+            "description": "A description for the resource. Can be multiple works / include spaces",
+            "default": "",
+            "examples": [
+                "Some Long Name"
+            ]
+        },
+        "entrypoint": {
+            "$id": "#/properties/entrypoint",
+            "type": "string",
+            "title": "The Entrypoint Schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": "",
+            "examples": [
+                "f"
+            ]
+        },
+        "script": {
+            "$id": "#/properties/script",
+            "type": "string",
+            "title": "The Script Schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": "",
+            "examples": [
+                ""
+            ]
+        },
+        "arguments": {
+                "oneOf": [
+                    {"$ref": "#/definitions/argumentList"},
+                    {"$ref": "#/definitions/argumentDict"}
+                ]
+            }
+        },
+    "definitions": {
+        "argumentList": {
+            "$id": "#/definitions/argumentList",
+            "type": "array",
+            "title": "The Arguments Schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": [],
+            "examples": [
+                [
+                    "a",
+                    "b"
+                ]
+            ],
+            "additionalItems": true,
+            "items": {
+                "$id": "#/properties/arguments/items",
+                "type": "string",
+                "title": "The Items Schema",
+                "description": "An explanation about the purpose of this instance.",
+                "default": "",
+                "examples": [
+                    "a",
+                    "b"
+                ]
+            }
+        },
+        "argumentDict": {
+            "$id": "#/definitions/argumentDict",
+            "type": "object",
+            "title": "The Arguments Schema",
+            "description": "An explanation about the purpose of this instance."
+        }
+    }
+}
+'''
+
 ZEEBE_INSTANCE = '''
 {
     "$schema": "http://json-schema.org/draft-07/schema",

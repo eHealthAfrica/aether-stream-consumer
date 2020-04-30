@@ -217,7 +217,7 @@ def test__pipeline_adder_test(
     {
         'input_map': {
             'mode': '$.const.mode',
-            'workflow': '$.const.workflow',
+            'process_id': '$.const.process_id',
             'message_iterator': '$.const.message_iterator',
             'all_messages': '$.source.all_messages',
             'status': '$.source.status',
@@ -244,7 +244,7 @@ def test__create_work(zeebe_connection, transition, loaded_instance_manager):
         },
         'const': {
             'mode': 'single',
-            'workflow': 'echo-flow',
+            'process_id': 'echo-flow',
         }
 
     }
@@ -266,7 +266,7 @@ def test__create_work(zeebe_connection, transition, loaded_instance_manager):
         },
         'const': {
             'mode': 'multiple',
-            'workflow': 'echo-flow',
+            'process_id': 'echo-flow',
             'mapping': {},
             'message_iterator': '$.all_messages',
         }
