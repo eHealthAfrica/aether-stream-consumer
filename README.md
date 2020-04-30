@@ -8,7 +8,15 @@ If you want to get started right away, you can play with this system easily usin
 
 ##Transformation
 
-The most basic in this application is the `Transformation`. There are a few types. Some are only useful in conjunction with Zeebe, but others are general purpose. They're all basically small functional units that take input and provide an output.
+The most basic in this application is the `Transformation`. There are a few types. Some are only useful in conjunction with Zeebe, but others are general purpose. They're all basically small functional units that take input and provide an output. Unlike other Aether Consumers, these resource don't require a lot of definition up front. Except for JSCall, you likely only need one of each with a definition of:
+
+```
+{
+    "id": "default",
+    "name": "The default implementation"
+}
+```
+But you know that since you already checked out [the Zeebe Tester Repo](https://github.com/eHealthAfrica/zeebe_tester)
 
 
 ![Diagram](/doc/Selection_009.jpg)
@@ -52,7 +60,7 @@ Please note that all url must be resolved by the Google DNS service. This attemp
 
 #### JavaScript Call `/jscall`
 
-JS Call is powered by a sandboxed javascript environment based on `quickjs`. You define include an arbitrary piece of javascript which is executed at runtime on the input you define. quickjs does not have networking and some other higher level functions enabled, so you are limited to calculations you can perform in context, which is quite a lot. You can also require libraries which can be used by your function. You must define your own JSCalls before they can be run. There are a few in `/app/fixtures/examples.py`
+JS Call is powered by a sandboxed javascript environment based on `quickjs`. This is the only Transform that requires a specific definition. You define include an arbitrary piece of javascript which is executed at runtime on the input you define. quickjs does not have networking and some other higher level functions enabled, so you are limited to calculations you can perform in context, which is quite a lot. You can also require libraries which can be used by your function. You must define your own JSCalls before they can be run. There are a few in `/app/fixtures/examples.py`
 
 Here is a definition for a JSCall that turns a piece of JSON into a CSV. Do note that the value of the `script` field _must_ be a valid JSON string. That is to say, it should be minified, then escaped. The following is presented expanded to illustrate and is not valid as it has line breaks.
 
@@ -80,6 +88,11 @@ Here is a definition for a JSCall that turns a piece of JSON into a CSV. Do note
 ```
 This function would require the argument `jsonBody` and then return the stringified CSV as `"value": {the csv}`.
 
+You can also type you arguments like:
+```
+"arguments": {"arg_a": "str", "arg_b": "int"}
+```
+
 
 #### ZeebeMessage `/zeebemessage`
 
@@ -102,6 +115,12 @@ process_id     # the ID of the Zeebe Process
 variables      # (optional) an object with any data you want to pass
 version        # (optional) the workflow version you're trying to start
 ```
+
+#### ZeebeComplete `/zeebecomplete`
+
+This is the most specific transform, and will complete an in process ZeebeJob. This only works in a pipeline context that subscribed to a ZeebeJob. It takes a look at the passed in data, and based on a jsonpath evaluation either tells the broker that the job was successful or failed.
+
+
 
 
 ### Testing Transforms
