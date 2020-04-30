@@ -21,4 +21,5 @@ flake8
 mock
 pytest
 pytest-runner
+pytest-cov
 responses

@@ -62,7 +62,7 @@ KAFKA_CONFIG = get_kafka_config()
 
 
 class ZeebeInstance(BaseResource):
-    schema = schemas.PERMISSIVE
+    schema = schemas.ZEEBE_INSTANCE
     jobs_path = None
     name = 'zeebe'
     public_actions = BaseResource.public_actions + [
@@ -174,7 +174,7 @@ class ZeebeInstance(BaseResource):
 
 
 class Pipeline(BaseResource):
-    schema = schemas.PERMISSIVE
+    schema = schemas.PIPELINE
     name = 'pipeline'
     jobs_path = '$.pipelines'
 
@@ -247,7 +247,7 @@ class Job(BaseJob):
         transforms.JavascriptCall,
         Pipeline
     ]
-    schema = schemas.PERMISSIVE
+    schema = schemas.JOB
 
     public_actions = BaseJob.public_actions
 

@@ -9,6 +9,7 @@ services:
       # consumer settings
       CONSUMER_NAME: 'STREAM-TEST'
       TENANCY_HEADER: x-oauth-realm
+      LOG_LEVEL : ERROR
       # redis
       REDIS_PASSWORD: password
       # kafka settings

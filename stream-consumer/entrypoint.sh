@@ -26,15 +26,15 @@ test_flake8() {
 test_unit() {
     pytest -m unit
     cat /code/conf/extras/good_job.txt
-    rm -R .pytest_cache
-    rm -rf tests/__pycache__
+    rm -R .pytest_cache  || true
+    rm -rf tests/__pycache__ || true
 }
 
 test_integration() {
     pytest -m integration
     cat /code/conf/extras/good_job.txt
-    rm -R .pytest_cache
-    rm -rf tests/__pycache__
+    rm -R .pytest_cache || true
+    rm -rf tests/__pycache__  || true
 }
 
 case "$1" in
