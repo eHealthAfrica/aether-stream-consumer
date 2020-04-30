@@ -20,5 +20,5 @@
 #
 set -Eeuo pipefail
 
-scripts/run_unit_tests.sh || true
-scripts/run_integration_tests.sh || true
+scripts/run_unit_tests.sh
+scripts/run_integration_tests.sh
