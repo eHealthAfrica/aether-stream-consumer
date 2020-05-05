@@ -88,7 +88,7 @@ XF_ZEEBE_COMPLETE_REQUIRED = {
 XF_ZEEBE_SPAWN = {
     'id': 'echo',
     'name': 'echo',
-    'workflow_name': 'flow',
+    'process_id': 'flow',
     'spawn_mode': 'single',  # or multiple
     'iterable_source': '$.all_messages',
     # 'iterable_destination': 'message',
@@ -100,7 +100,7 @@ XF_ZEEBE_SPAWN_CONSTS = {
     'id': 'flow',
     'name': 'flow',
     'mode': 'multiple',
-    'workflow': 'flow',
+    'process_id': 'flow',
     'message_iterator': '$.all_messages',
 }
 

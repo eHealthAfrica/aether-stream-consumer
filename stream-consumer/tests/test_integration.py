@@ -74,7 +74,7 @@ def test__deploy_workflow(zeebe_connection, bpmn_echo, bpmn_sort):
     res = next(zeebe_connection.deploy_workflow('sort-flow', bpmn_sort))
     assert(res.workflows is not None)
 
-
+    
 @pytest.mark.integration
 def test__start(StreamConsumer):
     pass

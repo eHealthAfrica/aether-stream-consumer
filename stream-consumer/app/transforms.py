@@ -95,8 +95,8 @@ class ZeebeComplete(Transformation):
         Uses input_map to prepare output for job.
         Completes job
     '''
-    schema = schemas.BASIC
     name = 'zeebecomplete'
+    schema = schemas.BASIC
 
     def run(self, context: PipelineContext, transition: Transition) -> Dict:
         input_context = context.data
@@ -124,6 +124,7 @@ class ZeebeSpawn(Transformation):
     '''
     '''
     name = 'zeebespawn'
+    schema = schemas.BASIC
     single_requirements = [
         'process_id',
         'mode',
@@ -208,6 +209,7 @@ class ZeebeMessage(ZeebeSpawn):
     '''
     '''
     name = 'zeebemessage'
+    schema = schemas.BASIC
     s_requirements = [
         'mode',
         'message_id',
@@ -284,8 +286,8 @@ class ZeebeMessage(ZeebeSpawn):
 
 
 class RestCall(Transformation):
-    schema = schemas.PERMISSIVE
     name = 'restcall'
+    schema = schemas.BASIC
     jobs_path = None
 
     def _on_init(self):
@@ -296,7 +298,7 @@ class RestCall(Transformation):
 
 
 class JavascriptCall(Transformation):
-    schema = schemas.PERMISSIVE
+    schema = schemas.JS_CALL
     name = 'jscall'
     jobs_path = None
 
