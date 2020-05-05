@@ -13,9 +13,11 @@ Zeebe Instance is a basic resource that holds connection information to a Zeebe 
 You can also communicate directly with the broker through this API to test some functionality.
 
 `zeebe/test?id={resource-id}` : GET
+
 Tests if the broker can be connected to. Returns a boolean
 
 `zeebe/send_message?id={resource-id}` : POST
+
 Send a message to the broker
 
 Options (JSON):
@@ -26,6 +28,7 @@ Options (JSON):
 - variables = {}        : any data that you want to include with the message
 
 `zeebe/start_workflow?id={resource-id}`: POST
+
 Start a workflow on the broker
 
 Options (JSON):
