@@ -331,6 +331,11 @@ Just like individual Transformations, once you have a Pipeline Resource register
 
 In the case that a Zeebe operation is set to occur as part of the pipeline you're testing, that step will be skipped without Zeebe interaction. Zeebe interactions can be tested directly against a running broker.
 
+To test, POST your test payload to `{consumer_url}/pipeline/test?id={pipeline-id}`.
+If successful, the result will be the completed Pipeline Context. Otherwise, errors will help you to debug your Pipeline. For example, this 400 error that arose from an RESTCall Transform not receiving a url.
+```
+On Stage "one": TransformationError: Expected required fields, missing ['url']
+```
 
 
 
