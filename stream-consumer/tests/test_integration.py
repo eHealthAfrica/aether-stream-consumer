@@ -70,9 +70,9 @@ def test__broker_send_message(zeebe_connection):
 @pytest.mark.integration
 def test__deploy_workflow(zeebe_connection, bpmn_echo, bpmn_sort):
     res = next(zeebe_connection.deploy_workflow('echo-flow', bpmn_echo))
-    LOG.critical(res)
+    assert(res.workflows is not None)
     res = next(zeebe_connection.deploy_workflow('sort-flow', bpmn_sort))
-    LOG.critical(res)
+    assert(res.workflows is not None)
 
 
 @pytest.mark.integration
@@ -203,7 +203,6 @@ def test__pipeline_adder_test(
 ):
     res = RequestClientT1.post(f'{URL}/pipeline/test?id={_id}', json=body)
     if not error:
-        LOG.critical(res.text)
         res.raise_for_status()
         body = res.json()
         assert(body.get(result_field) == result_value)
@@ -217,7 +216,7 @@ def test__pipeline_adder_test(
     {
         'input_map': {
             'mode': '$.const.mode',
-            'workflow': '$.const.workflow',
+            'process_id': '$.const.process_id',
             'message_iterator': '$.const.message_iterator',
             'all_messages': '$.source.all_messages',
             'status': '$.source.status',
@@ -244,7 +243,7 @@ def test__create_work(zeebe_connection, transition, loaded_instance_manager):
         },
         'const': {
             'mode': 'single',
-            'workflow': 'echo-flow',
+            'process_id': 'echo-flow',
         }
 
     }
@@ -266,7 +265,7 @@ def test__create_work(zeebe_connection, transition, loaded_instance_manager):
         },
         'const': {
             'mode': 'multiple',
-            'workflow': 'echo-flow',
+            'process_id': 'echo-flow',
             'mapping': {},
             'message_iterator': '$.all_messages',
         }
@@ -284,7 +283,6 @@ def test__do_some_work(zeebe_connection):
             LOG.debug(job.variables)
         except Exception as aer:
             LOG.error(job.variables)
-            LOG.critical(aer)
 
 
 @pytest.mark.integration
@@ -299,8 +297,7 @@ def test__pipeline__read_kafka__make_job(
         results = pl.run()
         if results:
             for res in results:
-                LOG.debug(res)
-                assert(res[0] is True)
+                assert(res[0] is True), res
                 body = res[1]
                 if body['two']['result']:
                     odds += 1
@@ -314,11 +311,13 @@ def test__pipeline__read_kafka__make_job(
     for x in range(5):
         if found >= evens:
             LOG.debug('Found all expected work items')
+            assert(True)
+            return
             break
         results = zb.run()
         if results:
             for res in results:
                 found += 1
-                LOG.debug(res)
         else:
             LOG.debug('No work from Zeebe this run...')
+    assert(False), f'only found {found} of expected {evens}'

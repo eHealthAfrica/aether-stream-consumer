@@ -305,7 +305,7 @@ PIPELINE_KAFKA = {
     'zeebe_instance': 'default',
     'kafka_subscription': deepcopy(KAFKA_SUBSCRIPTION),
     'const': {
-        'workflow': 'sort-flow',
+        'process_id': 'sort-flow',
         'single': 'single',
         'message_listener': 'test_listener'
     },
@@ -342,7 +342,7 @@ PIPELINE_KAFKA = {
             'id': 'default',
             'transition': {
                 'input_map': {
-                    'workflow': '$.const.workflow',
+                    'process_id': '$.const.process_id',
                     'mode': '$.const.single',
                     'isOdd': '$.two.result',
                     'message': '$.source.message'
