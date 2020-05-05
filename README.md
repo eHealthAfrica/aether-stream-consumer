@@ -6,7 +6,35 @@ At a high level the purpose of this consumer is to subscribe to input from a sys
 If you want to get started right away, you can play with this system easily using the build tools in [the Zeebe Tester Repo](https://github.com/eHealthAfrica/zeebe_tester). I highly recommend this as the basic artifacts are already there, and can deploy automatically to the local instance if you modify them. It's by far the best way to get familiar with the system.
 
 
-##Transformation
+### ZeebeInstance `/zeebe`
+
+Zeebe Instance is a basic resource that holds connection information to a Zeebe cluster (or single broker) and allows you to interact with the broker with `Pipelines` to send messages, start workflows, and subscribe to Service Tasks.
+
+You can also communicate directly with the broker through this API to test some functionality.
+
+`zeebe/test?id={resource-id}` : GET
+Tests if the broker can be connected to. Returns a boolean
+
+`zeebe/send_message?id={resource-id}` : POST
+Send a message to the broker
+
+Options (JSON):
+- listener_name         : (required) the intended message listener on the broker
+- message_id=None       : optional unique_id for the message (uniqueness enforced if present)
+- correlationKey=None   : a key used to deliver this message to a running workflow
+- ttl=600_000           : how long the message should be held if it can't be delivered immediately
+- variables = {}        : any data that you want to include with the message
+
+`zeebe/start_workflow?id={resource-id}`: POST
+Start a workflow on the broker
+
+Options (JSON):
+ - process_id           : the ID of the process you want to start
+ - variables = {}       : and date you want to include in the workflow context
+ - version = 1          : the deployed version of the process to target
+
+
+## Transformation
 
 The most basic in this application is the `Transformation`. There are a few types. Some are only useful in conjunction with Zeebe, but others are general purpose. They're all basically small functional units that take input and provide an output. Unlike other Aether Consumers, these resource don't require a lot of definition up front. Except for JSCall, you likely only need one of each with a definition of:
 
@@ -60,7 +88,7 @@ Please note that all url must be resolved by the Google DNS service. This attemp
 
 #### JavaScript Call `/jscall`
 
-JS Call is powered by a sandboxed javascript environment based on `quickjs`. This is the only Transform that requires a specific definition. You define include an arbitrary piece of javascript which is executed at runtime on the input you define. quickjs does not have networking and some other higher level functions enabled, so you are limited to calculations you can perform in context, which is quite a lot. You can also require libraries which can be used by your function. You must define your own JSCalls before they can be run. There are a few in `/app/fixtures/examples.py`
+JS Call is powered by a sandboxed javascript environment based on `quickjs`. This is the only Transform that requires a specific definition. You define include an arbitrary piece of javascript which is executed at runtime on the input you define. *quickjs does not have networking* and some other higher level functions enabled, so you are limited to calculations you can perform in context, which is quite a lot. You can also require libraries which can be used by your function. You must define your own JSCalls before they can be run. There are a few in `/app/fixtures/examples.py`. Just remember if it needs to communicate (send an email, write to S3, etc), you _can't_ do it with JSCall.
 
 Here is a definition for a JSCall that turns a piece of JSON into a CSV. Do note that the value of the `script` field _must_ be a valid JSON string. That is to say, it should be minified, then escaped. The following is presented expanded to illustrate and is not valid as it has line breaks.
 
@@ -123,7 +151,7 @@ This is the most specific transform, and will complete an in process ZeebeJob. T
 
 
 
-### Testing Transforms
+#### Testing Transforms
 
 Each type of transform can be accessed, created and tested individually through the API.
 
@@ -133,9 +161,180 @@ If you had created the above jscall, you would test is by posting a JSON payload
 
 In this case, it would fail if you don't have "jsonBody" as one of the keys in your JSON payload.
 
+If you post a properly formatted payload (for the instance) like:
+```
+{
+  "jsonBody": {
+    "a": 1, "b": 2
+  }
+}
+```
+You the the correct result, a CSV (as an escaped string):
+```
+{
+  "result": "\"a\",\"b\"\n1,2"
+}
+```
+## Stage
+
+One level up from a transform, we have a `Stage`. A stage describes the input and output from a `Transformation`, and optionally provides validation criteria to be evaluated against an output. 
+
 ![Diagram](/doc/Selection_010.jpg)
 
+Stages are not themselves resources, as they operate on context specific data. I.E. the proper input map of a stage will be dependent on the outputs of previous stages, or the expected input from a subscription. Stages are combined in the next level of the hierarchy, `Pipeline`, but since they are highly configurable, they get their own section here. They include the following:
+ - name         : name of the stage, used as the key for it's output
+ - type         : type of the Transformation to be used
+ - id           : instance of the Transform to be used
+ - transition   : the transition definition (input / output map && validation) 
+
+Here is an example of a single stage:
+```
+{
+    'name': 'one',
+    'type': 'jscall',
+    'id': 'strictadder',
+    'transition': {
+        'input_map': {
+            'a': '$.source.value',
+            'b': '$.const.one'
+        },
+        'output_map': {
+            'result': '$.result'
+        },
+        'fail_condition': '$.result.`match(0, null)`'
+
+    }
+}
+```
+
+The input map and output map are both expressed as a set of JSONPath expressions, which can incorporate extensions as described [at the eHA JSONPath Extensions page](https://github.com/eHealthAfrica/jsonpath-extensions/).
+
+The input map describes the parameters to be passed to a `Transformation`. 
+
+Take the referenced JSCall Transformation for example:
+```
+{
+    'id': 'strictadder',
+    'name': 'Adder with Type Checking',
+    'entrypoint': 'f',
+    'script': '''
+        function adder(a, b) {
+        return a + b;
+    }
+    function f(a, b) {
+        return adder(a, b);
+    }
+
+    ''',
+    'arguments': {'a': 'int', 'b': 'int'}
+}
+```
+It expects integer arguments named `a` and `b`, so those must be included in out input map from some source. A reasonable input map then might be:
+```
+{
+    "a": "$.some.path.to.an.integer",
+    "b": "$.a.path.to.another.integer"
+}
+```
+Additionally you can add validation to the transition. This is expressed as a JSONPath expression that should evaluate to a boolean.
+```
+'fail_condition': '$.result.`match(0, null)`'
+```
+This isn't a very useful condition, but we've indicated here that we should fail if the result of `strictadder` is `0`. This is more useful for status_codes from the RESTCall transform, etc.
+
+
+## Pipeline
+
+A `Pipeline` is where concepts come together into an actionable set of behaviors. 
+
 ![Diagram](/doc/Selection_011.jpg)
+
+It consists of two primary things.
+ - A `subscription`. A data source that which at the moment can either be a set of Kafka Topics or a cursor to incoming instances of a Zeebe Service Task of a particular type.
+ - An ordered set of `stages` which transform the input.
+
+ As a pipeline runs, it carries a `context`, which allows each state to reference the source message from the subscription, a set of user defined constants, and the output of each previous stage. The constants for the pipeline are set when the resource is defined.
+
+Here is a very simple and pretty dumb pipeline, which uses the `strictadder` JSCall Transformation we used in the stages example.
+
+```
+{
+    'id': 'adder_example',
+    'zeebe_instance': 'default',
+    'zeebe_subscription': 'adder-worker',
+    'const': {
+        'one': 1,
+    },
+    'stages': [
+        {
+            'name': 'one',
+            'type': 'jscall',
+            'id': 'strictadder',
+            'transition': {
+                'input_map': {
+                    'a': '$.source.value',
+                    'b': '$.const.one'
+                },
+                'output_map': {
+                    'result': '$.result'
+                }
+            }
+        },
+        {
+            'name': 'two',
+            'type': 'jscall',
+            'id': 'strictadder',
+            'transition': {
+                'input_map': {
+                    'a': '$.one.result',
+                    'b': '$.const.one'
+                },
+                'output_map': {
+                    'result': '$.result'
+                }
+            }
+        },
+        {
+            'name': 'three',
+            'type': 'jscall',
+            'id': 'strictadder',
+            'transition': {
+                'input_map': {
+                    'a': '$.two.result',
+                    'b': '$.const.one'
+                },
+                'output_map': {
+                    'result': '$.result'
+                }
+            }
+        },
+        {
+            'name': 'four',
+            'type': 'zeebecomplete',
+            'id': 'default',
+            'transition': {
+                'input_map': {
+                    'added_value': '$.three.result'
+                }
+            }
+        }
+    ]
+}
+```
+You can see that the source of data here is a Zeebe ServiceTask of type `adder-worker` from which we expect an integer as input (`$.source.value`). From there, we have three identical stages that each add 1 to the value of the previous stage. At stage 4, we return the value from stage three via a `zeebecomplete` Transformation.
+
+Most pipelines should be quite simple, since you want to perform all logic in Zeebe when possible. Pipelines should source, transmit, transform or validate data, not sort it or perform a lot of logic.
+
+### Testing Pipelines
+
+Just like individual Transformations, once you have a Pipeline Resource registered, you can test it directly without side effect by posting a message to the test endpoint at `{consumer_url}/pipeline/test?id={pipeline-id}`. This is highly recommended to test for behavior and edge cases before adding it to a job where it runs automatically.
+
+In the case that a Zeebe operation is set to occur as part of the pipeline you're testing, that step will be skipped without Zeebe interaction. Zeebe interactions can be tested directly against a running broker.
+
+
+
+
+
 
 ![Diagram](/doc/Selection_012.jpg)
 
