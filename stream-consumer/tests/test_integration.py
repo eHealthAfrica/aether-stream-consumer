@@ -70,10 +70,11 @@ def test__broker_send_message(zeebe_connection):
 @pytest.mark.integration
 def test__deploy_workflow(zeebe_connection, bpmn_echo, bpmn_sort):
     res = next(zeebe_connection.deploy_workflow('echo-flow', bpmn_echo))
-    assert(res is not None)  # raises ZeebeError
+    assert(res.workflows is not None)
     res = next(zeebe_connection.deploy_workflow('sort-flow', bpmn_sort))
-    assert(res is not None)  # raises ZeebeError
+    assert(res.workflows is not None)
 
+    
 @pytest.mark.integration
 def test__start(StreamConsumer):
     pass
@@ -296,8 +297,7 @@ def test__pipeline__read_kafka__make_job(
         results = pl.run()
         if results:
             for res in results:
-                LOG.debug(res)
-                assert(res[0] is True)
+                assert(res[0] is True), res
                 body = res[1]
                 if body['two']['result']:
                     odds += 1
@@ -311,11 +311,13 @@ def test__pipeline__read_kafka__make_job(
     for x in range(5):
         if found >= evens:
             LOG.debug('Found all expected work items')
+            assert(True)
+            return
             break
         results = zb.run()
         if results:
             for res in results:
                 found += 1
-                LOG.debug(res)
         else:
             LOG.debug('No work from Zeebe this run...')
+    assert(False), f'only found {found} of expected {evens}'
