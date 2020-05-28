@@ -429,7 +429,7 @@ For example, here is a simple pipeline that allows for arbitrary REST calls to b
 }
 ```
 
-Looking at the input map to the stage "one" `restcall`, you can see that the behavior of the pipeline is driven directly by what is passed into the ServiceTask node's context.
+Looking at the input map to the stage "one" `restcall`, you can see that the behavior of the pipeline is driven directly by what is passed into the ServiceTask node's context. If you want this pipeline to service multiple ServiceTasks in the same workflow, each pointing to different URLs, you need to take advantage of Zeebe's local context by way of ["Input Variable Mappings"](https://docs.zeebe.io/reference/variables.html#inputoutput-variable-mappings).
 
 #### Use Kafka Messages to Drive Zeebe
 
