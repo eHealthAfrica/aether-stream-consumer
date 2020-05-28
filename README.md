@@ -3,7 +3,7 @@ Aether Consumer that performs operations based on streaming input.
 
 At a high level the purpose of this consumer is to subscribe to input from a system (currently either Apache Kafka or Zeebe) perform some actions based on the input, possibly transforming it, and then return a signal to the original system. This can be arranged in semi-arbitrary ways using a defined `Pipeline`. A pipeline manages a subscription, and orchestrates the movement of data through stages. Each stage has a transformation. This sounds more complicated than it is in practice, and the flexibility allows us to do all sorts of things, combining the power of Kafka, and Zeebe (BPMN) with the ability to perform arbitrary computations.
 
-If you want to get started right away, you can play with this system easily using the build tools in [the Zeebe Tester Repo](https://github.com/eHealthAfrica/zeebe_tester). I highly recommend this as the basic artifacts are already there, and can deploy automatically to the local instance if you modify them. It's by far the best way to get familiar with the system.
+If you want to get started right away, you can play with this system easily using the build tools in [the Zeebe Tester Repo](https://github.com/eHealthAfrica/zeebe_tester). I highly recommend this as the basic artifacts are already there, and can deploy automatically to the local instance if you modify them. It's by far the best way to get familiar with the system, even if you plan to use Kafka as your source.
 
 
 ### ZeebeInstance `/zeebe`
@@ -330,7 +330,17 @@ Here is a very simple and pretty dumb pipeline, which uses the `strictadder` JSC
 ```
 You can see that the source of data here is a Zeebe ServiceTask of type `adder-worker` from which we expect an integer as input (`$.source.value`). From there, we have three identical stages that each add 1 to the value of the previous stage. At stage 4, we return the value from stage three via a `zeebecomplete` Transformation.
 
-Most pipelines should be quite simple, since you want to perform all logic in Zeebe when possible. Pipelines should source, transmit, transform or validate data, not sort it or perform a lot of logic.
+The schema also allows for constants to be included in the pipeline definition in the `const` section. These are then available to all stages at the path `$.const`.
+
+Most pipelines should be quite simple, since if you're using Zeebe, you want to perform all possible logic there. Pipelines should source, transmit, transform or validate data, not sort it or perform a lot of logic.
+
+You can also source messages from kafka to power a pipeline. Simply replace the zeebe information with a single `kafka_subscription` key, the value being a description of the subscription like:
+
+```
+kafka_subscription: {"topic_pattern": "*"},
+```
+
+
 
 ### Testing Pipelines
 
@@ -344,14 +354,129 @@ If successful, the result will be the completed Pipeline Context. Otherwise, err
 On Stage "one": TransformationError: Expected required fields, missing ['url']
 ```
 
+## Job
 
-
-
+A `Job` is a worker that allows for multiple pipelines to be executed regularly.
 
 ![Diagram](/doc/Selection_012.jpg)
 
+A job is quite simple and really just a container for managing the running of one or more pipelines. This is a valid definition of a job running one pipeline:
+
+```
+{
+    "id": "my_job",
+    "name": "A Stream Consumer Job",
+    "pipelines": ["my_pipeline"]
+}
+```
+
+If you have more than one pipeline included, the job will process them in series, checking if there's work to be done each before going to the next. If you need a pipeline to be checked as often as possible for work, consider putting it into a job where it is the only pipeline. If it's not time sensitive, then you can group many pipelines into a single job.
+
+
 ![Diagram](/doc/Selection_013.jpg)
+
+## Typical Use Patterns
+
+#### Do work on behalf of a Zeebe ServiceTask
 
 ![Diagram](/doc/Selection_014.jpg)
 
+This is quite a powerful and flexible use pattern. The goal should be to build your pipeline in such a way that the ServiceTask can take a variety of parameters to drive it.
+
+For example, here is a simple pipeline that allows for arbitrary REST calls to be parameterized in the BPMN, passed to the stream-consumer for execution, and the result be registered as the Task Result.
+
+```
+{
+    "id": "rest_handler",
+    "zeebe_instance": "default",
+    "zeebe_subscription": "rest-worker",
+    "stages": [
+        {
+            "name": "one",
+            "type": "restcall",
+            "id": "default",
+            "transition": {
+                "input_map": {
+                    "url": "$.source.url",
+                    "method": "$.source.method",
+                    "headers": "$.source.headers",
+                    "token": "$.source.token",
+                    "basic_auth": "$.source.basic_auth",
+                    "query_params": "$.source.query_params",
+                    "json_body": "$.source.json_body"
+                },
+                "output_map": {
+                    "text": "$.text",
+                    "failed": "$.request_failed",
+                    "status_code": "$.status_code",
+                    "json": "$.json"
+                }
+            }
+        },
+        {
+            "name": "two",
+            "type": "zeebecomplete",
+            "id": "default",
+            "transition": {
+                "input_map": {
+                    "status_code": "$.one.status_code",
+                    "json": "$.one.json",
+                    "text": "$.one.text"
+                }
+            }
+        }
+    ]
+}
+```
+
+Looking at the input map to the stage "one" `restcall`, you can see that the behavior of the pipeline is driven directly by what is passed into the ServiceTask node's context.
+
+#### Use Kafka Messages to Drive Zeebe
+
 ![Diagram](/doc/Selection_015.jpg)
+
+This would likely be part of a more complex system, but using `kafka_subscription` as your pipeline source and a mix of the available zeebe interaction XFs, 
+ - `zeebemessage` to send a message to the broker or
+ - `zeebespawn` to create a new workflow instance
+
+You can create very complex logic that can signal across the two systems. For example, using the zeebe MessageReceive task to block a workflow from proceeding until the correct CorrelationKey value is emitted as a `zeebemessage` via Kafka.
+
+
+#### Use Kafka Messages to drive the RESTCall XF.
+
+A pipeline need not interact with Zeebe at all. Here is a simplification of the previous generic rest-worker, reconfigured for a specific Kafka Source.
+
+```
+{
+    "id": "send-reports",
+    kafka_subscription: {"topic_pattern": "the_report_topic"},
+    "const": {
+        "url": "https://fixed-url-for-post",
+        "method": "POST",
+        "auth": {"user": "a-user", "password": "password"}  
+    },
+    "stages": [
+        {
+            "name": "one",
+            "type": "restcall",
+            "id": "default",
+            "transition": {
+                "input_map": {
+                    "url": "$.const.url",
+                    "method": "$.const.method",
+                    "basic_auth": "$.const.basic_auth",
+                    "json_body": "$.source"
+                },
+                "output_map": {
+                    "text": "$.text",
+                    "failed": "$.request_failed",
+                    "status_code": "$.status_code",
+                    "json": "$.json"
+                }
+            }
+        }
+    ]
+}
+```
+
+The downside of this approach currently is that there's not a good way to re-enqueue failed messages. We're working on a feature that will allow production to Kafka as a Transform, which should allow better failure handling.

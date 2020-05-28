@@ -415,8 +415,6 @@ PIPELINE = '''
   "type": "object",
   "title": "The Root Schema",
   "required": [
-    "id",
-    "name",
     "topic_pattern"
   ],
   "properties": {
