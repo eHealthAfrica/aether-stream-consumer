@@ -118,7 +118,7 @@ def test__xf_request_dns(q, expect):
     ({
         'method': 'get',
         'url': 'http://localhost:5984'
-    }, RuntimeError, None)
+    }, None, 200)
 ])
 @pytest.mark.unit
 def test__xf_request_methods(config, exception, status):
