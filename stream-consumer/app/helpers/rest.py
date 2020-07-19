@@ -120,8 +120,6 @@ class RestHelper(object):
     ):
         # we can template the url with other config elements
         url = url.format(**config)
-        if not self.resolve(url):
-            raise RuntimeError(f'DNS resolution failed for {url}')
         fn = self.rest_calls[method.upper()]
         auth = HTTPBasicAuth(basic_auth['user'], basic_auth['password']) if basic_auth else None
         token = {'Authorization': f'access_token {token}'} if token else {}
