@@ -163,7 +163,7 @@ class ZeebeSpawn(Transformation):
         message_destination=None,
         **local_context
     ) -> Iterable[Tuple[str, Dict]]:
-        # returns (workflow, msg) generator
+        # returns (process_id, msg) generator
         if mode == 'single':
             yield {
                 'process_id': process_id,
