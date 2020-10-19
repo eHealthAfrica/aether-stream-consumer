@@ -50,6 +50,8 @@ from app.helpers.zb import (
     ZeebeConnection
 )
 
+import traceback
+
 
 LOG = get_logger('artifacts')
 CONSUMER_CONFIG = get_consumer_config()
@@ -72,7 +74,6 @@ class ZeebeInstance(BaseResource):
     ]
 
     _message_requires = {
-        # 'message_id': 'str',
         'listener_name': 'str'
     }
 
@@ -87,6 +88,7 @@ class ZeebeInstance(BaseResource):
             client_id=d.get('client_id'),
             client_secret=d.get('client_secret'),
             audience=d.get('audience'),
+            post_data_type=d.get('post_data_type'),
             token_url=d.get('token_url')
         )
 
@@ -98,8 +100,15 @@ class ZeebeInstance(BaseResource):
 
     # public method
     def test(self, *args, **kwargs):
-        res = next(self.get_connection().get_topology())
-        return res.brokers is not None
+        try:
+            res = next(self.get_connection().get_topology())
+            if isinstance(res, Exception):
+                raise res
+            return res.brokers is not None
+        except Exception as ex:
+            LOG.debug(
+                ''.join(traceback.format_exception(etype=type(ex), value=ex, tb=ex.__traceback__)))
+            raise ConsumerHttpException(f'Unexpected error: {ex}', 500)
 
     @check_required('_message_requires')
     def _send_message(

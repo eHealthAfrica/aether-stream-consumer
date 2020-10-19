@@ -16,7 +16,7 @@ RUN apt-get update -qq && \
         --allow-remove-essential \
         --allow-change-held-packages \
         install gcc && \
-    pip install -q --upgrade pip
+    pip install -q --upgrade pip dumb-init
 
 WORKDIR /code
 
@@ -33,4 +33,6 @@ COPY ./ /code
 RUN useradd -ms /bin/false aether
 RUN chown -R aether: /code
 
-ENTRYPOINT ["/code/entrypoint.sh"]
+STOPSIGNAL SIGINT
+
+ENTRYPOINT ["dumb-init", "--", "/code/entrypoint.sh"]

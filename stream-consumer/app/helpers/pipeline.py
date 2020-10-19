@@ -211,8 +211,9 @@ class PipelinePubSub(object):
         if self.definition.get('const'):
             data = {'const': self.definition['const']}
         if not self.zeebe_connection:
-            self.zeebe_connection = (None  # noqa
-                if not self.zeebe \
+            self.zeebe_connection = (
+                None
+                if not self.zeebe
                 else self.zeebe.get_connection())
         return PipelineContext(
             evt,
@@ -256,8 +257,9 @@ class PipelinePubSub(object):
     def __make_zeebe_getter(self):
         workflow_id = self.definition.get('zeebe_subscription')
         if not self.zeebe_connection:
-            self.zeebe_connection = (None  # noqa
-                if not self.zeebe \
+            self.zeebe_connection = (
+                None
+                if not self.zeebe
                 else self.zeebe.get_connection())
 
         def _getter() -> Iterable[ZeebeJob]:

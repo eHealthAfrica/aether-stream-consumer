@@ -21,30 +21,37 @@
 from dataclasses import dataclass
 from dataclasses import field as DataClassField
 import json
+import socket
+import ssl
 from typing import (
     Dict,
     Callable,
     List
 )
+
+
 import grpc
 import requests
 from zeebe_grpc import (
     gateway_pb2,
     gateway_pb2_grpc
 )
-# from aet.logger import get_logger
+from aet.logger import get_logger
 from .event import ZeebeJob
 
-# LOG = get_logger('zb')
+
+LOG = get_logger('zb')
 
 
 def get_credentials(config: 'ZeebeConfig'):
-    body = {
-        'client_id': config.client_id,
-        'client_secret': config.client_secret,
-        'audience': config.audience
+    data = {
+        config.post_data_type: {
+            'client_id': config.client_id,
+            'client_secret': config.client_secret,
+            'audience': config.audience
+        }
     }
-    res = requests.post(config.token_url, json=body)
+    res = requests.post(config.token_url, **data)
     res.raise_for_status()
     data = res.json()
     token = data['access_token']
@@ -76,15 +83,19 @@ def __zb_request_handler(
         Wraps raised ZeebeGRPC Errors in ZeebeError which is more readable && easier to deal with.
     '''
     retry -= 1
+
     try:
         if inst.config.is_secured:
-            with grpc.secure_channel(
-                    *zb_connection_details(inst)) as channel:
-                kwargs['channel'] = channel
-                yield from fn(*args, **kwargs)
-                # this is important for job_iterator to work
-                # without exiting the secure_channel context
-                # yield from res
+            if inst.config.use_ssl:
+                with grpc.secure_channel(
+                        *zb_connection_details(inst)) as channel:
+                    kwargs['channel'] = channel
+                    yield from fn(*args, **kwargs)
+                    # this is important for job_iterator to work
+                    # without exiting the secure_channel context
+                    # yield from res
+            else:
+                raise RuntimeError('Server does not support SSL, use insecure_channel\n')
         else:
             with grpc.insecure_channel(inst.config.url) as channel:
                 kwargs['channel'] = channel
@@ -99,6 +110,8 @@ def __zb_request_handler(
         # we have to catch this and re-raise as otherwise
         # for some reason grpc._channel doesn't exist
         raise her
+    except RuntimeError as rte:
+        raise rte
     except grpc._channel._InactiveRpcError as ier:
         zbr = ZeebeError(rpc_error=ier)
         if '401' not in zbr.details:
@@ -142,13 +155,25 @@ class ZeebeConfig:
     client_secret: str = None
     audience: str = None
     token_url: str = None
+    post_data_type: str = 'data'
     is_secured: bool = DataClassField(init=False)
+    use_ssl: bool = DataClassField(init=False)
 
     def __post_init__(self):
         if not self.client_id:
             self.is_secured = False
         else:
             self.is_secured = True
+            context = ssl.create_default_context()
+            _host, port = self.url.split(':')
+            try:
+                with socket.create_connection((_host, int(port))) as sock:
+                    with context.wrap_socket(sock, server_hostname=_host) as ssock:
+                        if ssock.version():
+                            self.use_ssl = True
+            except ssl.SSLError:
+                self.use_ssl = False
+            LOG.debug(f'use ssl: {self.use_ssl}')
 
 
 class ZeebeConnection(object):

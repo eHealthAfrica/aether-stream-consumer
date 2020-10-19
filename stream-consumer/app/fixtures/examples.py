@@ -42,7 +42,8 @@ ZEEBE_INSTANCE = {
     'client_id': os.environ.get('ZEEBE_CLIENT_ID'),
     'client_secret': os.environ.get('ZEEBE_CLIENT_SECRET'),
     'audience': os.environ.get('ZEEBE_AUDIENCE'),
-    'token_url': os.environ.get('ZEEBE_AUTHORIZATION_SERVER_URL')
+    'token_url': os.environ.get('ZEEBE_AUTHORIZATION_SERVER_URL'),
+    'post_data_type': os.environ.get('ZEEBE_AUTHORIZATION_SERVER_DATA_TYPE')
 }
 
 ZEEBE_SUBSCRIPTION = {

@@ -27,15 +27,13 @@ services:
       # ZEEBE_CLIENT_ID: ${ZEEBE_CLIENT_ID}
       # ZEEBE_CLIENT_SECRET: ${ZEEBE_CLIENT_SECRET}
       # ZEEBE_AUTHORIZATION_SERVER_URL: ${ZEEBE_AUTHORIZATION_SERVER_URL}
+      # ZEEBE_AUTHORIZATION_SERVER_DATA_TYPE: ${ZEEBE_AUTHORIZATION_SERVER_DATA_TYPE}
 
   zeebe:
     container_name: zeebe_broker
-    image: camunda/zeebe:0.23.0
+    image: camunda/zeebe:0.24.1
     environment:
       - ZEEBE_LOG_LEVEL=debug
-    volumes:
-      - ./lib/zeebe-hazelcast-exporter-0.8.0-jar-with-dependencies.jar:/usr/local/zeebe/exporters/zeebe-hazelcast-exporter.jar
-      - ./conf/application.yaml:/usr/local/zeebe/config/application.yaml
 
   redis:
     image: redis:alpine

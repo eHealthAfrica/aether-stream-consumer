@@ -18,17 +18,38 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import signal
 from time import sleep
+
 from app.consumer import StreamConsumer
 from app.config import consumer_config, kafka_config
 
+
+from aet.logger import get_logger
+LOG = get_logger('entry')
+
+
+def wrapper(man):
+    LOG.debug('setting signal handler')
+
+    def fault(*args, **kwargs):
+        man.dump_stack()
+        man.stop()
+
+    LOG.debug('signal handler ok')
+    return fault
+
+
 if __name__ == '__main__':
-    manager = StreamConsumer(consumer_config, kafka_config)
-    while True:
-        try:
-            for x in range(10):
-                sleep(1)
-            else:
-                break
-        except KeyboardInterrupt:
-            manager.stop()
+    try:
+        manager = StreamConsumer(consumer_config, kafka_config)
+        _fn = wrapper(manager)
+        signal.signal(signal.SIGINT, _fn)
+        LOG.debug('Started...')
+        # while True:
+        #     # LOG.debug(manager.dump_stack())
+        #     LOG.debug(manager.healthcheck())
+        #     sleep(1)
+    except Exception as err:
+        print('dead!')
+        print(err)

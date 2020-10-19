@@ -253,6 +253,14 @@ ZEEBE_INSTANCE = '''
             "examples": [
                 ""
             ]
+        },
+        "post_data_type" : {
+          "$id": "#/properties/post_data_type",
+          "title": "Auth POST data type",
+          "description": "How the auth system expects to receive POSTed credentials",
+          "default": "data",
+          "type": "string",
+          "enum": ["data", "json"]
         }
     }
 }
