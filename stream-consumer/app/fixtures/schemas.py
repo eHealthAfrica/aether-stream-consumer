@@ -170,6 +170,59 @@ JS_CALL = '''
 }
 '''
 
+KAFKA_WRITE = '''
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "$id": "http://example.com/example.json",
+    "type": "object",
+    "title": "Basic Requirements",
+    "description": "The Minimum required for any Consumer Resource",
+    "default": {},
+    "additionalProperties": true,
+    "required": [
+        "id",
+        "name",
+        "topic",
+        "schema"
+    ],
+    "properties": {
+        "id": {
+            "$id": "#/properties/id",
+            "type": "string",
+            "title": "ID",
+            "description": "The ID used to reference the instance",
+            "examples": [
+                "default"
+            ]
+        },
+        "name": {
+            "$id": "#/properties/name",
+            "type": "string",
+            "title": "Name",
+            "description": "A description for the resource. Can be multiple works / include spaces",
+            "examples": [
+                "Some Long Name"
+            ]
+        },
+        "topic": {
+            "$id": "#/properties/topic",
+            "type": "string",
+            "title": "Write Topic",
+            "description": "The topic name to be written to",
+            "examples": [
+                "my-topic"
+            ]
+        },
+        "schema": {
+            "$id": "#/properties/script",
+            "type": "object",
+            "title": "The Schema for the written object",
+            "additionalProperties": true
+        }
+    }
+}
+'''
+
 ZEEBE_INSTANCE = '''
 {
     "$schema": "http://json-schema.org/draft-07/schema",

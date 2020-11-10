@@ -218,6 +218,44 @@ XF_JS_CSV_PARSER = {
     'libraries': ['https://cdn.jsdelivr.net/npm/json2csv@4.2.1/dist/json2csv.umd.js']
 }
 
+XF_KAFKA_CREATE = {
+    'id': 'error',
+    'name': 'ErrorLogging',
+    'topic': 'errorlog',
+    'schema': {
+        'name': 'error',
+        'type': 'record',
+        'fields': [
+            {
+                'name': 'message',
+                'type': [
+                    'null',
+                    'string'
+                ]
+            },
+            {
+                'name': 'status_code',
+                'type': [
+                    'null',
+                    'int'
+                ]
+            },
+            {
+                'name': 'id',
+                'type': 'string'
+            },
+            {
+                'name': 'timestamp',
+                'type': [
+                    'null',
+                    'string'
+                ],
+                '@aether_extended_type': 'dateTime'
+            }
+        ]
+    }
+}
+
 REST_TRANSFORMATION = {
     'id': 'simple',
     'name': 'simple',
