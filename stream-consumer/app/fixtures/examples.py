@@ -218,7 +218,7 @@ XF_JS_CSV_PARSER = {
     'libraries': ['https://cdn.jsdelivr.net/npm/json2csv@4.2.1/dist/json2csv.umd.js']
 }
 
-XF_KAFKA_CREATE = {
+XF_KAFKA_MESSAGE = {
     'id': 'error',
     'name': 'ErrorLogging',
     'topic': 'errorlog',

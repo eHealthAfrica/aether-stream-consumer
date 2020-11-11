@@ -18,22 +18,27 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import json
+from threading import Lock
 from typing import (
     Dict,
     Iterable,
     Tuple
 )
 
+from confluent_kafka import Producer as KafkaProducer
+from spavro.schema import parse
 from werkzeug.local import LocalProxy
 
 from aet.exceptions import ConsumerHttpException
 from aet.logger import get_logger
-from aet.resource import BaseResource
+from aet.resource import BaseResource, Draft7Validator, ValidationError
 from aet.jsonpath import CachedParser
 
 from app.fixtures import schemas
 from app.helpers import check_required, TransformationError
 from app.helpers.js import JSHelper
+from app.helpers.kafka import TopicHelper
 from app.helpers.rest import RestHelper
 from app.helpers.event import (
     TestEvent,
@@ -283,6 +288,68 @@ class ZeebeMessage(ZeebeSpawn):
         if not (type(res).__name__ == 'PublishMessageResponse'):
             raise TransformationError(f'Message {message_id} received unknown response')
         return {'result': True}
+
+
+class KafkaMessage(Transformation):
+    schema = schemas.KAFKA_MESSAGE
+    name = 'kafkamessage'
+    jobs_path = None
+
+    @classmethod
+    def _validate(cls, definition, *args, **kwargs) -> bool:
+        # subclassing a Resource a second time breaks some of the class methods, re-implement
+        return cls._validate_pretty(definition, *args, **kwargs).get('valid')
+
+    @classmethod
+    def _validate_pretty(cls, definition, *args, **kwargs):
+        '''
+        Return a lengthy validations.
+        {'valid': True} on success
+        {'valid': False, 'validation_errors': [errors...]} on failure
+        '''
+        if isinstance(definition, LocalProxy):
+            definition = definition.get_json()
+        if not cls.validator:
+            cls.validator = Draft7Validator(json.loads(cls.schema))
+        errors = []
+        try:
+            cls.validator.validate(definition)
+        except ValidationError:
+            errors = sorted(cls.validator.iter_errors(definition), key=str)
+        try:
+            TopicHelper.parse(definition['schema'])
+        except Exception:
+            errors.append('Invalid Avro Schema for messages')
+        topic = f'''{kwargs.get('tenant', '')}.{definition['topic']}'''
+        if not TopicHelper.valid_topic(topic):
+            errors.append(f'Invalid topic name: {topic}')
+        return {
+            'valid': len(errors) < 1,
+            'validation_errors': [str(e) for e in errors]
+        }
+
+    def _on_init(self):
+        self.lock = Lock()
+        self.schema = parse(self.definition['schema'])
+
+    def run(self, context: PipelineContext, transition: Transition) -> Dict:
+        local_context = transition.prepare_input(context.data, self.definition)
+        try:
+            result = self.do_work(local_context, context.kafka)
+            output = transition.prepare_output(result, self.definition)
+            transition.check_failure(output)
+            return output
+        except Exception as err:
+            raise TransformationError(err)
+
+    def acknowledge(self, *args, **kwargs):
+        pass
+
+    def do_work(self, local_context: Dict, kafka: KafkaProducer) -> Dict:
+        # get the lock
+        # send the message
+        # wait for the lock to be released or timeout
+        pass
 
 
 class RestCall(Transformation):

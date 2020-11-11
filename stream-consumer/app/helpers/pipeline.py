@@ -31,6 +31,8 @@ from typing import (
     Tuple,
 )
 
+from confluent_kafka import Producer as KafkaProducer
+
 from aet.jsonpath import CachedParser
 from aet.resource import ResourceDefinition
 from aet.logger import get_logger
@@ -201,7 +203,7 @@ class PipelinePubSub(object):
         self.kafka_group_id = kafka_group
         self.definition = definition
         self.kafka_consumer = None
-        self.kafka_producer = None
+        self.kafka_producer = self.__get_kafka_producer()
         self.source_type = None
         self.zeebe: 'ZeebeInstance' = zeebe  # noqa
         self.zeebe_connection: ZeebeConnection = None
@@ -220,6 +222,16 @@ class PipelinePubSub(object):
             kafka_producer=self.kafka_producer,
             data=data
         )
+
+    def __has_kafka_setter(self) -> bool:
+        return 'kafkamessage' in set(
+            [stage.get('type') for stage in self.definition.get('stages', [])]
+        )
+
+    def __get_kafka_producer(self) -> KafkaProducer:
+        if self.__has_kafka_setter():
+            args = {k.lower(): v for k, v in KAFKA_CONFIG.copy().items()}
+            return KafkaProducer(**args)
 
     def __message_getter(self):
         if not self.source_type:
