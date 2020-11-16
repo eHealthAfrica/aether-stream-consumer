@@ -40,7 +40,7 @@ from aet.resource import ResourceDefinition
 from aet.logger import get_logger
 from aet.kafka import KafkaConsumer, FilterConfig, MaskConfig
 
-from app.config import get_kafka_config
+from app.config import get_kafka_config, get_kafka_admin_config
 from app.fixtures.schemas import ERROR_LOG_AVRO
 from . import TransformationError
 from .event import Event, KafkaMessage, TestEvent, ZeebeJob
@@ -247,8 +247,7 @@ class PipelinePubSub(object):
 
     def __get_kafka_producer(self) -> KafkaProducer:
         if self.__has_kafka_setter():
-            args = {k.lower(): v for k, v in KAFKA_CONFIG.copy().items()}
-            return KafkaProducer(**args)
+            return KafkaProducer(**get_kafka_admin_config())
 
     def __message_getter(self):
         if not self.source_type:
@@ -395,6 +394,7 @@ class PipelineSet(object):
         # if reports to Kafka:
         self.error_topic = TopicHelper(
             json.loads(ERROR_LOG_AVRO),
+            self.tenant,
             self.definition.get('error_handling').get('error_topic')
         ) if 'error_handling' in self.definition else None
 

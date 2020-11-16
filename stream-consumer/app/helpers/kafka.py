@@ -19,6 +19,7 @@
 # under the License.
 
 from io import BytesIO
+import json
 import re
 from typing import Callable, Dict, List, Union
 
@@ -42,7 +43,7 @@ class TopicHelper(object):
 
     @staticmethod
     def parse(schema_definition) -> schema.Schema:
-        return schema.parse(schema_definition)
+        return schema.parse(json.dumps(schema_definition))
 
     @staticmethod
     def valid_topic(name) -> bool:

@@ -223,7 +223,7 @@ XF_KAFKA_MESSAGE = {
     'name': 'ErrorLogging',
     'topic': 'errorlog',
     'schema': {
-        'name': 'error',
+        'name': 'error_logger',
         'type': 'record',
         'fields': [
             {
@@ -425,6 +425,50 @@ PIPELINE_ZEEBE = {
                     'message': '$.source.message'
                 },
                 'fail_condition': '$.source.isOdd'  # already a boolean
+            }
+        }
+    ]
+}
+
+
+PIPELINE_KAFKA_LOGS = {
+    'id': 'kafka-report',
+    'name': 'something-different',
+    'kafka_subscription': deepcopy(KAFKA_SUBSCRIPTION),
+    'error_handling': {
+        'error_topic': None,
+        'log_failure': True,
+        'log_success': True
+
+    },
+    'const': {},
+    'stages': [
+        {
+            'name': 'one',
+            'type': 'jscall',
+            'id': 'sizer',
+            'transition': {
+                'input_map': {
+                    'obj': '$.source.message'
+                },
+                'output_map': {
+                    'result': '$.result'
+                }
+            }
+        },
+        {
+            'name': 'two',
+            'type': 'kafkamessage',
+            'id': 'error',
+            'transition': {
+                'input_map': {
+                    'id': '$.source.id',
+                    'status_code': '$.one.result',
+                    'message': '$.source.message'
+                },
+                'output_map': {
+                    'result': '$.result'
+                }
             }
         }
     ]

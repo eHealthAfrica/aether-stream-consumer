@@ -240,6 +240,9 @@ class Pipeline(BaseResource):
 
 class Job(BaseJob):
     name = 'job'
+
+    # Don't forget to register all resource types here!
+
     _resources = [
         ZeebeInstance,
         transforms.ZeebeComplete,
@@ -247,6 +250,7 @@ class Job(BaseJob):
         transforms.ZeebeSpawn,
         transforms.RestCall,
         transforms.JavascriptCall,
+        transforms.KafkaMessage,
         Pipeline
     ]
     schema = schemas.JOB

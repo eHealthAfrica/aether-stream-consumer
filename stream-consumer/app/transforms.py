@@ -290,8 +290,8 @@ class ZeebeMessage(ZeebeSpawn):
 
 
 class KafkaMessage(Transformation):
-    schema = schemas.KAFKA_MESSAGE
     name = 'kafkamessage'
+    schema = schemas.KAFKA_MESSAGE
     jobs_path = None
 
     @classmethod
@@ -329,7 +329,11 @@ class KafkaMessage(Transformation):
 
     def _on_init(self):
         self.lock = Lock()
-        self.helper = TopicHelper(self.definition['schema'])
+        self.helper = TopicHelper(
+            self.definition['schema'],
+            self.tenant,
+            self.definition['topic']
+        )
         self.last_call_kafka_error = None
 
     def run(self, context: PipelineContext, transition: Transition) -> Dict:

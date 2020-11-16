@@ -322,3 +322,8 @@ def test__pipeline__read_kafka__make_job(
         else:
             LOG.debug('No work from Zeebe this run...')
     assert(False), f'only found {found} of expected {evens}'
+
+
+@pytest.mark.integration
+def test__pipeline__kafka_msg_and_log(instance_manager_requires_kafka):
+    pass

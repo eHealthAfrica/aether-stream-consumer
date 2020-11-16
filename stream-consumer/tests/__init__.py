@@ -19,6 +19,7 @@
 # under the License.
 
 
+from copy import deepcopy
 import json
 import pytest
 import os
@@ -257,6 +258,40 @@ def loaded_instance_manager(transformation_definitions):
         man.update(_id, _type, TENANT, body)
     yield man
     man.stop()
+
+
+@pytest.mark.integration
+@pytest.fixture(scope='session')
+def instance_manager_requires_kafka(loaded_instance_manager):
+
+    def _format(_type, b):
+        return (b['id'], _type, b)
+
+    # things that require kafka
+
+    # kafka_message XF
+    messages_topic_name = str(uuid4())
+    xf_kafka_msg = deepcopy(examples.XF_KAFKA_MESSAGE)
+    xf_kafka_msg['topic'] = messages_topic_name
+
+    # error reporting pipeline
+    reports_topic_name = str(uuid4())
+
+    reporting_pipeline = deepcopy(examples.PIPELINE_KAFKA_LOGS)
+    reporting_pipeline['error_handling']['error_topic'] = reports_topic_name
+
+    for i in [
+            ('kafkamessage', xf_kafka_msg),
+            ('pipeline', reporting_pipeline)]:
+
+        _id, _type, body = _format(*i)
+        loaded_instance_manager.update(_id, _type, TENANT, body)
+    yield loaded_instance_manager
+    # delete topics
+    kafka_security = config.get_kafka_admin_config()
+    kadmin = get_admin_client(kafka_security)
+    for topic in (messages_topic_name, reports_topic_name):
+        delete_topic(kadmin, f'{TENANT}.{topic}')
 
 
 @pytest.mark.unit
