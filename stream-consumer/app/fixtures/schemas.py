@@ -736,3 +736,37 @@ PIPELINE = '''
   }
 }
 '''
+
+ERROR_LOG_AVRO = '''
+{
+    "name": "Event",
+    "type": "record",
+    "fields": [
+        {
+            "name": "id",
+            "type": "string"
+        },
+        {
+            "name": "event",
+            "type": "string"
+        },
+        {
+            "name": "timestamp",
+            "type": "string",
+            "@aether_extended_type": "dateTime"
+        },
+        {
+            "name": "pipeline",
+            "type": "string"
+        },
+        {
+            "name": "success",
+            "type": "boolean"
+        },
+        {
+            "name": "error",
+            "type": "string"
+        }
+    ]
+}
+'''

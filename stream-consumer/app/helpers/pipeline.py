@@ -19,9 +19,11 @@
 # under the License.
 
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 import enum
 import json
+from uuid import uuid4
 
 from typing import (
     Callable,
@@ -39,8 +41,10 @@ from aet.logger import get_logger
 from aet.kafka import KafkaConsumer, FilterConfig, MaskConfig
 
 from app.config import get_kafka_config
+from app.fixtures.schemas import ERROR_LOG_AVRO
 from . import TransformationError
 from .event import Event, KafkaMessage, TestEvent, ZeebeJob
+from .kafka import TopicHelper
 from .zb import ZeebeConnection
 
 LOG = get_logger('pipe')
@@ -121,6 +125,17 @@ class Transition:
             return (self.fail_condition, False)
         # if no conditions, this stage always passes
         return (None, True)
+
+
+@dataclass
+class PipelineResult:
+    success: bool
+    context: 'PipelineContext'
+    error: str = None
+    timestamp: str = field(init=False)
+
+    def __post_init__(self):
+        self.timestamp = datetime.now().isoformat()
 
 
 class PipelineConnection(enum.Enum):
@@ -224,6 +239,8 @@ class PipelinePubSub(object):
         )
 
     def __has_kafka_setter(self) -> bool:
+        if 'error_topic' in self.definition:
+            return True
         return 'kafkamessage' in set(
             [stage.get('type') for stage in self.definition.get('stages', [])]
         )
@@ -330,18 +347,56 @@ class PipelinePubSub(object):
 
 
 class PipelineSet(object):
+
+    # decorator
+    def report(wraps):
+        def fn(*args, **kwargs):
+            self = args[0]
+            context: PipelineContext = args[1]
+            res: PipelineResult = wraps(*args, **kwargs)
+            if not self.error_topic:
+                return res
+            msg = dict({
+                'id': context.event.key if context.event else str(uuid4()),
+                'event': context.event.__class__.__name__ if context.event else None,
+                'pipeline': self.pipeline
+            }, **res.asdict())
+            try:
+                del msg['content']
+            except Exception:
+                pass
+            if msg['success'] is False and \
+                    self.definition['error_handling'].get('log_errors', True):
+                self.error_topic.produce(msg, context.kafka_producer)
+            if msg['success'] is True and \
+                    self.definition['error_handling'].get('log_success', False):
+                self.error_topic.produce(msg, context.kafka_producer)
+            return res
+
+        return fn
+
     def __init__(
         self,
+        pipeline: str,
+        tenant: str,
         definition: Dict = None,
         getter: Callable = None,
         stages: List[Stage] = None
     ):
+        self.pipeline = pipeline
+        self.tenant = tenant
+        self.definition = definition or {}
         if stages:
             self.stages = stages
         else:
             if not all([definition, getter]):
                 raise ValueError('PipelineSet requires definition and getter')
             self.stages = self._prepare_stages(definition, getter)
+        # if reports to Kafka:
+        self.error_topic = TopicHelper(
+            json.loads(ERROR_LOG_AVRO),
+            self.definition.get('error_handling').get('error_topic')
+        ) if 'error_handling' in self.definition else None
 
     def _prepare_stages(self, definition, getter: Callable):
         return [
@@ -370,11 +425,20 @@ class PipelineSet(object):
             else:
                 context.register_result(stage.name, {'error': str(ter)})
 
-    def run(self, context: PipelineContext, raise_errors=True):
+    @report
+    def run(self, context: PipelineContext, raise_errors=True) -> PipelineResult:
         for stage in self.stages:
             try:
                 self._execute_stage(stage, context, raise_errors)
             except Exception as err:
-                raise TransformationError(
-                    f'On Stage "{stage.name}": {type(err).__name__}: {err}')
-        return context
+                return PipelineResult(
+                    success=False,
+                    context=context,
+                    error=f'On Stage "{stage.name}": {type(err).__name__}: {err}'
+                )
+        result = PipelineResult(
+            success=True,
+            context=context,
+            error=None
+        )
+        return result

@@ -27,7 +27,6 @@ from typing import (
 )
 
 from confluent_kafka import Producer as KafkaProducer
-from spavro.schema import parse
 from werkzeug.local import LocalProxy
 
 from aet.exceptions import ConsumerHttpException
@@ -330,7 +329,8 @@ class KafkaMessage(Transformation):
 
     def _on_init(self):
         self.lock = Lock()
-        self.schema = parse(self.definition['schema'])
+        self.helper = TopicHelper(self.definition['schema'])
+        self.last_call_kafka_error = None
 
     def run(self, context: PipelineContext, transition: Transition) -> Dict:
         local_context = transition.prepare_input(context.data, self.definition)
@@ -340,16 +340,31 @@ class KafkaMessage(Transformation):
             transition.check_failure(output)
             return output
         except Exception as err:
-            raise TransformationError(err)
+            msg = f'Error sending: {err}' if not self.last_call_kafka_error else \
+                f'Error sending: {self.last_call_kafka_error}'
+            raise TransformationError(msg) from err
+        finally:
+            self.last_call_kafka_error = None
+            self.lock.release()
 
-    def acknowledge(self, *args, **kwargs):
-        pass
+    def acknowledge(self, err=None, msg=None, _=None, **kwargs):
+        if err:
+            self.last_call_kafka_error = err
+        self.lock.release()
 
     def do_work(self, local_context: Dict, kafka: KafkaProducer) -> Dict:
-        # get the lock
+        # validate the message
+        if not self.helper.validate(local_context):
+            raise TransformationError('Message does not conform to registered schema')
+        if not kafka:
+            raise TransformationError('Message valid, but no Kafka instance in context')
+        # get the lock but don't block if it's already locked.
+        self.lock.acquire(False)
         # send the message
+        self.helper.produce(local_context, kafka, self.acknowledge)
         # wait for the lock to be released or timeout
-        pass
+        if not self.lock.acquire(True, 30):
+            raise TransformationError('Kafka Publication not acknowledged before timeout.')
 
 
 class RestCall(Transformation):
