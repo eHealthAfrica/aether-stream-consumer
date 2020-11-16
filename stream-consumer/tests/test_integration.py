@@ -326,4 +326,15 @@ def test__pipeline__read_kafka__make_job(
 
 @pytest.mark.integration
 def test__pipeline__kafka_msg_and_log(instance_manager_requires_kafka):
-    pass
+    manager_ = instance_manager_requires_kafka
+    pl = manager_.get('kafka-report', 'pipeline', TENANT)
+    for x in range(5):
+        results = pl.run()
+        if results:
+            res: 'PipelineResult'
+            for res in results:
+                LOG.debug(json.dumps(res.context.data, indent=2))
+                assert(res.success is True), (res.error, res.context.data)
+                LOG.debug(res)
+        else:
+            LOG.debug('No work from Kafka this run...')

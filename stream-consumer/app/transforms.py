@@ -339,7 +339,7 @@ class KafkaMessage(Transformation):
     def run(self, context: PipelineContext, transition: Transition) -> Dict:
         local_context = transition.prepare_input(context.data, self.definition)
         try:
-            result = self.do_work(local_context, context.kafka)
+            result = self.do_work(local_context, context.kafka_producer)
             output = transition.prepare_output(result, self.definition)
             transition.check_failure(output)
             return output
@@ -349,12 +349,18 @@ class KafkaMessage(Transformation):
             raise TransformationError(msg) from err
         finally:
             self.last_call_kafka_error = None
-            self.lock.release()
+            self.unlock()
 
     def acknowledge(self, err=None, msg=None, _=None, **kwargs):
         if err:
             self.last_call_kafka_error = err
-        self.lock.release()
+        self.unlock()
+
+    def unlock(self):
+        try:
+            self.lock.release()
+        except RuntimeError:
+            pass
 
     def do_work(self, local_context: Dict, kafka: KafkaProducer) -> Dict:
         # validate the message

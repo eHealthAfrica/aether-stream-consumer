@@ -137,6 +137,11 @@ class PipelineResult:
     def __post_init__(self):
         self.timestamp = datetime.now().isoformat()
 
+    def for_report(self) -> Dict:
+        return {k: getattr(self, k) for k in [
+            'success', 'error', 'timestamp'
+        ]}
+
 
 class PipelineConnection(enum.Enum):
     KAFKA = 1
@@ -153,7 +158,8 @@ class PipelineContext(object):
         data: Dict = None  # other data to pass (consts, etc)
     ):
         self.zeebe = zeebe
-        self.kafka = kafka_producer
+        self.kafka_producer = kafka_producer
+        self.event = event
         self.data: OrderedDict[str, Dict] = {}
         if isinstance(event, ZeebeJob):
             self.register_result('source', event.variables)
@@ -239,7 +245,7 @@ class PipelinePubSub(object):
         )
 
     def __has_kafka_setter(self) -> bool:
-        if 'error_topic' in self.definition:
+        if 'error_handling' in self.definition:
             return True
         return 'kafkamessage' in set(
             [stage.get('type') for stage in self.definition.get('stages', [])]
@@ -356,10 +362,10 @@ class PipelineSet(object):
             if not self.error_topic:
                 return res
             msg = dict({
-                'id': context.event.key if context.event else str(uuid4()),
+                'id': context.event.key if context.event.key else str(uuid4()),
                 'event': context.event.__class__.__name__ if context.event else None,
                 'pipeline': self.pipeline
-            }, **res.asdict())
+            }, **res.for_report())
             try:
                 del msg['content']
             except Exception:

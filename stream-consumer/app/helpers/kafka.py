@@ -63,7 +63,7 @@ class TopicHelper(object):
     def produce(self, doc: Union[Dict, List[Dict]], producer, callback: Callable = None):
         with BytesIO() as bytes_writer:
             writer = DataFileWriter(
-                bytes_writer, DatumWriter(), schema, codec='deflate')
+                bytes_writer, DatumWriter(), self.schema, codec='deflate')
             if not isinstance(doc, list):
                 doc = [doc]
             for row in doc:
