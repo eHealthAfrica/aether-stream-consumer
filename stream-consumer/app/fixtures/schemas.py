@@ -765,7 +765,10 @@ ERROR_LOG_AVRO = '''
         },
         {
             "name": "error",
-            "type": "string"
+            "type": [
+                "null",
+                "string"
+            ]
         }
     ]
 }

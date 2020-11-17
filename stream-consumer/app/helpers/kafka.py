@@ -31,10 +31,12 @@ from spavro.io import (
 )
 
 from aet.kafka_utils import create_topic, get_admin_client, get_broker_info
+from aet.logger import get_logger
 
 from app.config import get_kafka_admin_config
 
 
+LOG = get_logger('KAFKA')
 ADMIN_CONFIG = get_kafka_admin_config()
 RE_VALID_KAFKA_TOPIC = re.compile(r'[a-z0-9.-]')
 
@@ -60,7 +62,14 @@ class TopicHelper(object):
         if self.topic not in info.get('topics'):
             create_topic(kadmin, self.topic)
 
+    def acknowledge(self, err=None, msg=None, _=None, **kwargs):
+        if err:
+            LOG.critical(f'unhandled kafka produce error on {self.topic}: {err}')
+        else:
+            LOG.debug('unhandled kafka acceptance')
+
     def produce(self, doc: Union[Dict, List[Dict]], producer, callback: Callable = None):
+        callback = callback or self.acknowledge
         with BytesIO() as bytes_writer:
             writer = DataFileWriter(
                 bytes_writer, DatumWriter(), self.schema, codec='deflate')
@@ -71,7 +80,7 @@ class TopicHelper(object):
                 writer.append(msg)
             writer.flush()
             raw_bytes = bytes_writer.getvalue()
-
+        LOG.debug(f'produced to {self.topic}')
         producer.poll(0)
         producer.produce(
             self.topic,

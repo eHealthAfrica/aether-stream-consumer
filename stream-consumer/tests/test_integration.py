@@ -333,8 +333,6 @@ def test__pipeline__kafka_msg_and_log(instance_manager_requires_kafka):
         if results:
             res: 'PipelineResult'
             for res in results:
-                LOG.debug(json.dumps(res.context.data, indent=2))
                 assert(res.success is True), (res.error, res.context.data)
-                LOG.debug(res)
         else:
             LOG.debug('No work from Kafka this run...')

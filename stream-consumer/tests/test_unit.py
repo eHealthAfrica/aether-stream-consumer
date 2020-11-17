@@ -256,6 +256,14 @@ def test__xf_js_helper_remote_lib(definition):
     assert(reader[1000][1] == 999)
 
 
+@pytest.mark.parametrize('definition', [
+    ResourceDefinition(examples.XF_KAFKA_MESSAGE)
+])
+@pytest.mark.unit
+def test__xf_kafka_message_validate(definition):
+    assert(transforms.KafkaMessage._validate(definition) is True)
+
+
 @pytest.mark.unit
 def test__stage_simple():
     transition = {

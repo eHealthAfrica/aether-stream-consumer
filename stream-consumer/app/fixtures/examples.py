@@ -462,9 +462,9 @@ PIPELINE_KAFKA_LOGS = {
             'id': 'error',
             'transition': {
                 'input_map': {
-                    'id': '$.source.id',
+                    'id': '$.source.message._id',
                     'status_code': '$.one.result',
-                    'message': '$.source.message'
+                    'message': '$.source.message.operational_status'
                 },
                 'output_map': {
                     'result': '$.result'

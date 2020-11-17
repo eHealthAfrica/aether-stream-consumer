@@ -19,7 +19,6 @@
 # under the License.
 
 import json
-from threading import Lock
 from typing import (
     Dict,
     Iterable,
@@ -328,7 +327,6 @@ class KafkaMessage(Transformation):
         }
 
     def _on_init(self):
-        self.lock = Lock()
         self.helper = TopicHelper(
             self.definition['schema'],
             self.tenant,
@@ -349,32 +347,24 @@ class KafkaMessage(Transformation):
             raise TransformationError(msg) from err
         finally:
             self.last_call_kafka_error = None
-            self.unlock()
 
     def acknowledge(self, err=None, msg=None, _=None, **kwargs):
         if err:
+            LOG.error(f'caught error from kafka broker: {err}')
             self.last_call_kafka_error = err
-        self.unlock()
-
-    def unlock(self):
-        try:
-            self.lock.release()
-        except RuntimeError:
-            pass
+        else:
+            LOG.debug(f'caught success from kafka broker')
 
     def do_work(self, local_context: Dict, kafka: KafkaProducer) -> Dict:
         # validate the message
         if not self.helper.validate(local_context):
             raise TransformationError('Message does not conform to registered schema')
-        if not kafka:
+        if kafka is None:  # don't use "if not kafka" evaluates to false if it's idle
             raise TransformationError('Message valid, but no Kafka instance in context')
-        # get the lock but don't block if it's already locked.
-        self.lock.acquire(False)
         # send the message
         self.helper.produce(local_context, kafka, self.acknowledge)
-        # wait for the lock to be released or timeout
-        if not self.lock.acquire(True, 30):
-            raise TransformationError('Kafka Publication not acknowledged before timeout.')
+        # trigger producer flush to get errors, slower but that's ok
+        kafka.flush()
 
 
 class RestCall(Transformation):
