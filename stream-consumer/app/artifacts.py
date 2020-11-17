@@ -19,6 +19,7 @@
 # under the License.
 
 from functools import partial
+import json
 from time import sleep
 from typing import (
     List
@@ -43,7 +44,8 @@ from app.helpers.event import (
 )
 from app.helpers.pipeline import (
     PipelinePubSub,
-    PipelineSet,
+    PipelineResult,
+    PipelineSet
 )
 from app.helpers.zb import (
     ZeebeConfig,
@@ -185,6 +187,8 @@ class Pipeline(BaseResource):
     def _on_init(self):
         self.kafka_consumer_group = f'{self.tenant}.stream.pipeline.{self.id}'
         self.pipeline_set = PipelineSet(
+            self.id,
+            self.tenant,
             definition=self.definition,
             getter=partial(
                 self.context.get, tenant=self.tenant)
@@ -210,14 +214,10 @@ class Pipeline(BaseResource):
     def _on_change(self):
         self._on_init()
 
-    def run(self):
+    def run(self) -> List[PipelineResult]:
         results = []
         for ctx in self.pubsub.get():
-            try:
-                result = self.pipeline_set.run(ctx)
-                results.append([True, result.data])
-            except Exception as err:
-                results.append([False, err, ctx.data])
+            results.append(self.pipeline_set.run(ctx))
         return results
 
     # public!
@@ -230,14 +230,19 @@ class Pipeline(BaseResource):
             else:
                 raise ConsumerHttpException('Test Method expects a JSON Post', 400)
             context = self.pubsub.test(TestEvent(**message))
-            context = self.pipeline_set.run(context)
-            return context.data
+            result = self.pipeline_set.run(context)
+            if result.error:
+                raise RuntimeError(json.dumps(context))
+            return result
         except Exception as err:
             raise ConsumerHttpException(err, 400)
 
 
 class Job(BaseJob):
     name = 'job'
+
+    # Don't forget to register all resource types here!
+
     _resources = [
         ZeebeInstance,
         transforms.ZeebeComplete,
@@ -245,6 +250,7 @@ class Job(BaseJob):
         transforms.ZeebeSpawn,
         transforms.RestCall,
         transforms.JavascriptCall,
+        transforms.KafkaMessage,
         Pipeline
     ]
     schema = schemas.JOB
@@ -268,20 +274,13 @@ class Job(BaseJob):
         try:
             pls: List[Pipeline] = self._job_pipelines(config)
             for pl in pls:
-                completed = 0
-                ok = 0
-                failed = 0
-                results = pl.run()
+                results: List[PipelineResult] = pl.run()
                 if results:
-                    for res in results:
-                        completed += 1
-                        if res[0] is True:
-                            ok += 1
-                        else:
-                            failed += 1
-
-                    self.log.debug(f'Pipeline: {pl.id} did work: ok/failed/total ='
-                                   f' {ok}/{failed}/{completed}')
+                    completed = len(results)
+                    ok = len([i for i in results if i.success])
+                    failed = len([i for i in results if i.error])
+                    self.log.info(f'Pipeline: {pl.id} did work: ok/failed/total ='
+                                  f' {ok}/{failed}/{completed}')
                 else:
                     self.log.debug(f'Pipeline {pl.id} is idle')
             return []

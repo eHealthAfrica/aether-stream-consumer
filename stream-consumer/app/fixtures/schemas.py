@@ -170,6 +170,59 @@ JS_CALL = '''
 }
 '''
 
+KAFKA_MESSAGE = '''
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "$id": "http://example.com/example.json",
+    "type": "object",
+    "title": "Basic Requirements",
+    "description": "The Minimum required for any Consumer Resource",
+    "default": {},
+    "additionalProperties": true,
+    "required": [
+        "id",
+        "name",
+        "topic",
+        "schema"
+    ],
+    "properties": {
+        "id": {
+            "$id": "#/properties/id",
+            "type": "string",
+            "title": "ID",
+            "description": "The ID used to reference the instance",
+            "examples": [
+                "default"
+            ]
+        },
+        "name": {
+            "$id": "#/properties/name",
+            "type": "string",
+            "title": "Name",
+            "description": "A description for the resource. Can be multiple works / include spaces",
+            "examples": [
+                "Some Long Name"
+            ]
+        },
+        "topic": {
+            "$id": "#/properties/topic",
+            "type": "string",
+            "title": "Write Topic",
+            "description": "The topic name to be written to",
+            "examples": [
+                "my-topic"
+            ]
+        },
+        "schema": {
+            "$id": "#/properties/script",
+            "type": "object",
+            "title": "The Schema for the written object",
+            "additionalProperties": true
+        }
+    }
+}
+'''
+
 ZEEBE_INSTANCE = '''
 {
     "$schema": "http://json-schema.org/draft-07/schema",
@@ -346,203 +399,153 @@ PIPELINE = '''
       ]
     }
   ],
-  "properties": {
-    "id": {
-      "$id": "#/properties/id",
-      "type": "string",
-      "title": "The Id Schema",
-      "description": "An explanation about the purpose of this instance.",
-      "default": "",
-      "examples": [
-        "default"
-      ]
-    },
-    "name": {
-      "$id": "#/properties/name",
-      "type": "string",
-      "title": "The Name Schema",
-      "description": "An explanation about the purpose of this instance.",
-      "default": "",
-      "examples": [
-        "Some Name"
-      ]
-    },
-    "zeebe_instance": {
-      "$id": "#/properties/zeebe_instance",
-      "type": "string",
-      "title": "The Zeebe_instance Schema",
-      "description": "An explanation about the purpose of this instance.",
-      "default": "",
-      "examples": [
-        "default"
-      ]
-    },
-    "zeebe_subscription": {
-      "$id": "#/properties/zeebe_subscription",
-      "type": "string",
-      "title": "The Zeebe_subscription Schema",
-      "description": "An explanation about the purpose of this instance.",
-      "default": "",
-      "examples": [
-        "rest-worker"
-      ]
-    },
-    "kafka_subscription": { "#ref": "#/definitions/kafka_subscription"},
-    "const": {
-      "$id": "#/properties/const",
-      "type": "object",
-      "title": "The Const Schema",
-      "description": "Constants made available to the pipeline at runtime"
-    },
-    "stages": {
-      "$id": "#/properties/stages",
-      "type": "array",
-      "title": "The Stages Schema",
-      "description": "An explanation about the purpose of this instance.",
-      "default": [],
-      "examples": [
-        []
-      ],
-      "additionalItems": true,
-      "items": {
-        "$ref": "#/definitions/stage"
-      }
-    }
-  },
   "definitions": {
-    "kafka_subscription": {
-  "$id": "#definitions/kafka_subscription",
-  "type": "object",
-  "title": "The Root Schema",
-  "required": [
-    "topic_pattern"
-  ],
-  "properties": {
-    "id": {
-      "$id": "#/properties/id",
-      "type": "string",
-      "title": "The Id Schema",
-      "default": "",
-      "examples": [
-        "the id for this resource"
-      ],
-      "pattern": "^(.*)$"
-    },
-    "name": {
-      "$id": "#/properties/name",
-      "type": "string",
-      "title": "The Name Schema",
-      "default": "",
-      "examples": [
-        "a nice name for this resource"
-      ],
-      "pattern": "^(.*)$"
-    },
-    "topic_pattern": {
-      "$id": "#/properties/topic_pattern",
-      "type": "string",
-      "title": "The Topic_pattern Schema",
-      "default": "",
-      "examples": [
-        "source topic for data i.e. gather*"
-      ],
-      "pattern": "^(.*)$"
-    },
-    "topic_options": {
-      "$id": "#/properties/topic_options",
+    "error_handler": {
+      "$id": "#definitions/error_handler",
       "type": "object",
-      "title": "The Topic_options Schema",
-      "anyOf": [
-        {
-          "required": [
-            "masking_annotation"
-          ]
-        },
-        {
-          "required": [
-            "filter_required"
-          ]
-        }
+      "title": "The Error Handler Schema",
+      "required": [
+        "error_topic"
       ],
-      "dependencies": {
-        "filter_required": [
-          "filter_field_path",
-          "filter_pass_values"
-        ],
-        "masking_annotation": [
-          "masking_levels",
-          "masking_emit_level"
-        ]
-      },
+      "additionalProperties": false,
       "properties": {
-        "masking_annotation": {
-          "$id": "#/properties/topic_options/properties/masking_annotation",
+        "error_topic": {
+          "$id": "#/properties/error_handler/properties/error_topic",
           "type": "string",
-          "title": "The Masking_annotation Schema",
-          "default": "",
+          "title": "ErrorEventTopic",
           "examples": [
-            "@aether_masking"
+            "The Topic to write error events"
           ],
-          "pattern": "^(.*)$"
+          "pattern": "[a-z0-9.-]"
         },
-        "masking_levels": {
-          "$id": "#/properties/topic_options/properties/masking_levels",
-          "type": "array",
-          "title": "The Masking_levels Schema",
-          "items": {
-            "$id": "#/properties/topic_options/properties/masking_levels/items",
-            "title": "The Items Schema",
-            "examples": [
-              "private",
-              "public"
-            ],
-            "pattern": "^(.*)$"
-          }
-        },
-        "masking_emit_level": {
-          "$id": "#/properties/topic_options/properties/masking_emit_level",
-          "type": "string",
-          "title": "The Masking_emit_level Schema",
-          "default": "",
-          "examples": [
-            "public"
-          ],
-          "pattern": "^(.*)$"
-        },
-        "filter_required": {
-          "$id": "#/properties/topic_options/properties/filter_required",
+        "log_errors": {
+          "$id": "#/properties/error_handler/properties/log_errors",
           "type": "boolean",
-          "title": "The Filter_required Schema",
-          "default": false,
-          "examples": [
-            false
-          ]
+          "title": "LogErrors",
+          "default": true
         },
-        "filter_field_path": {
-          "$id": "#/properties/topic_options/properties/filter_field_path",
+        "log_success": {
+          "$id": "#/properties/error_handler/properties/log_success",
+          "type": "boolean",
+          "title": "LogSuccess",
+          "default": false
+        }
+      }
+    },
+    "kafka_subscription": {
+      "$id": "#definitions/kafka_subscription",
+      "type": "object",
+      "title": "The Root Schema",
+      "required": [
+        "topic_pattern"
+      ],
+      "properties": {
+        "topic_pattern": {
+          "$id": "#/properties/topic_pattern",
           "type": "string",
-          "title": "The Filter_field_path Schema",
+          "title": "The Topic_pattern Schema",
           "default": "",
           "examples": [
-            "some.json.path"
+            "source topic for data i.e. gather*"
           ],
           "pattern": "^(.*)$"
         },
-        "filter_pass_values": {
-          "$id": "#/properties/topic_options/properties/filter_pass_values",
-          "type": "array",
-          "title": "The Filter_pass_values Schema",
-          "items": {
-            "$id": "#/properties/topic_options/properties/filter_pass_values/items",
-            "title": "The Items Schema",
-            "examples": [
-              false
+        "topic_options": {
+          "$id": "#/properties/topic_options",
+          "type": "object",
+          "title": "The Topic_options Schema",
+          "anyOf": [
+            {
+              "required": [
+                "masking_annotation"
+              ]
+            },
+            {
+              "required": [
+                "filter_required"
+              ]
+            }
+          ],
+          "dependencies": {
+            "filter_required": [
+              "filter_field_path",
+              "filter_pass_values"
+            ],
+            "masking_annotation": [
+              "masking_levels",
+              "masking_emit_level"
             ]
+          },
+          "properties": {
+            "masking_annotation": {
+              "$id": "#/properties/topic_options/properties/masking_annotation",
+              "type": "string",
+              "title": "The Masking_annotation Schema",
+              "default": "",
+              "examples": [
+                "@aether_masking"
+              ],
+              "pattern": "^(.*)$"
+            },
+            "masking_levels": {
+              "$id": "#/properties/topic_options/properties/masking_levels",
+              "type": "array",
+              "title": "The Masking_levels Schema",
+              "items": {
+                "$id": "#/properties/topic_options/properties/masking_levels/items",
+                "title": "The Items Schema",
+                "examples": [
+                  "private",
+                  "public"
+                ],
+                "pattern": "^(.*)$"
+              }
+            },
+            "masking_emit_level": {
+              "$id": "#/properties/topic_options/properties/masking_emit_level",
+              "type": "string",
+              "title": "The Masking_emit_level Schema",
+              "default": "",
+              "examples": [
+                "public"
+              ],
+              "pattern": "^(.*)$"
+            },
+            "filter_required": {
+              "$id": "#/properties/topic_options/properties/filter_required",
+              "type": "boolean",
+              "title": "The Filter_required Schema",
+              "default": false,
+              "examples": [
+                false
+              ]
+            },
+            "filter_field_path": {
+              "$id": "#/properties/topic_options/properties/filter_field_path",
+              "type": "string",
+              "title": "The Filter_field_path Schema",
+              "default": "",
+              "examples": [
+                "some.json.path"
+              ],
+              "pattern": "^(.*)$"
+            },
+            "filter_pass_values": {
+              "$id": "#/properties/topic_options/properties/filter_pass_values",
+              "type": "array",
+              "title": "The Filter_pass_values Schema",
+              "items": {
+                "$id": "#/properties/topic_options/properties/filter_pass_values/items",
+                "title": "The Items Schema",
+                "examples": [
+                  false
+                ]
+              }
+            }
           }
         }
       }
-    }
-  }},
+    },
     "stage": {
       "$id": "#/definitions/stage",
       "type": "object",
@@ -662,7 +665,111 @@ PIPELINE = '''
           }
         }
       }
+    }},
+  "properties": {
+    "id": {
+      "$id": "#/properties/id",
+      "type": "string",
+      "title": "The Id Schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "examples": [
+        "default"
+      ]
+    },
+    "name": {
+      "$id": "#/properties/name",
+      "type": "string",
+      "title": "The Name Schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "examples": [
+        "Some Name"
+      ]
+    },
+    "zeebe_instance": {
+      "$id": "#/properties/zeebe_instance",
+      "type": "string",
+      "title": "The Zeebe_instance Schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "examples": [
+        "default"
+      ]
+    },
+    "zeebe_subscription": {
+      "$id": "#/properties/zeebe_subscription",
+      "type": "string",
+      "title": "The Zeebe_subscription Schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "examples": [
+        "rest-worker"
+      ]
+    },
+    "kafka_subscription": {
+      "$ref": "#/definitions/kafka_subscription"
+    },
+    "error_handling": {
+      "$ref": "#/definitions/error_handler"
+    },
+    "const": {
+      "$id": "#/properties/const",
+      "type": "object",
+      "title": "The Const Schema",
+      "description": "Constants made available to the pipeline at runtime"
+    },
+    "stages": {
+      "$id": "#/properties/stages",
+      "type": "array",
+      "title": "The Stages Schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": [],
+      "examples": [
+        []
+      ],
+      "additionalItems": true,
+      "items": {
+        "$ref": "#/definitions/stage"
+      }
     }
   }
+}
+'''
+
+ERROR_LOG_AVRO = '''
+{
+    "name": "Event",
+    "type": "record",
+    "fields": [
+        {
+            "name": "id",
+            "type": "string"
+        },
+        {
+            "name": "event",
+            "type": "string"
+        },
+        {
+            "name": "timestamp",
+            "type": "string",
+            "@aether_extended_type": "dateTime"
+        },
+        {
+            "name": "pipeline",
+            "type": "string"
+        },
+        {
+            "name": "success",
+            "type": "boolean"
+        },
+        {
+            "name": "error",
+            "type": [
+                "null",
+                "string"
+            ]
+        }
+    ]
 }
 '''

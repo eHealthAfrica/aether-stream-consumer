@@ -18,22 +18,25 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import json
 from typing import (
     Dict,
     Iterable,
     Tuple
 )
 
+from confluent_kafka import Producer as KafkaProducer
 from werkzeug.local import LocalProxy
 
 from aet.exceptions import ConsumerHttpException
 from aet.logger import get_logger
-from aet.resource import BaseResource
+from aet.resource import BaseResource, Draft7Validator, ValidationError
 from aet.jsonpath import CachedParser
 
 from app.fixtures import schemas
 from app.helpers import check_required, TransformationError
 from app.helpers.js import JSHelper
+from app.helpers.kafka import TopicHelper
 from app.helpers.rest import RestHelper
 from app.helpers.event import (
     TestEvent,
@@ -283,6 +286,85 @@ class ZeebeMessage(ZeebeSpawn):
         if not (type(res).__name__ == 'PublishMessageResponse'):
             raise TransformationError(f'Message {message_id} received unknown response')
         return {'result': True}
+
+
+class KafkaMessage(Transformation):
+    name = 'kafkamessage'
+    schema = schemas.KAFKA_MESSAGE
+    jobs_path = None
+
+    @classmethod
+    def _validate(cls, definition, *args, **kwargs) -> bool:
+        # subclassing a Resource a second time breaks some of the class methods, re-implement
+        return cls._validate_pretty(definition, *args, **kwargs).get('valid')
+
+    @classmethod
+    def _validate_pretty(cls, definition, *args, **kwargs):
+        '''
+        Return a lengthy validations.
+        {'valid': True} on success
+        {'valid': False, 'validation_errors': [errors...]} on failure
+        '''
+        if isinstance(definition, LocalProxy):
+            definition = definition.get_json()
+        if not cls.validator:
+            cls.validator = Draft7Validator(json.loads(cls.schema))
+        errors = []
+        try:
+            cls.validator.validate(definition)
+        except ValidationError:
+            errors = sorted(cls.validator.iter_errors(definition), key=str)
+        try:
+            TopicHelper.parse(definition['schema'])
+        except Exception:
+            errors.append('Invalid Avro Schema for messages')
+        topic = f'''{kwargs.get('tenant', '')}.{definition['topic']}'''
+        if not TopicHelper.valid_topic(topic):
+            errors.append(f'Invalid topic name: {topic}')
+        return {
+            'valid': len(errors) < 1,
+            'validation_errors': [str(e) for e in errors]
+        }
+
+    def _on_init(self):
+        self.helper = TopicHelper(
+            self.definition['schema'],
+            self.tenant,
+            self.definition['topic']
+        )
+        self.last_call_kafka_error = None
+
+    def run(self, context: PipelineContext, transition: Transition) -> Dict:
+        local_context = transition.prepare_input(context.data, self.definition)
+        try:
+            result = self.do_work(local_context, context.kafka_producer)
+            output = transition.prepare_output(result, self.definition)
+            transition.check_failure(output)
+            return output
+        except Exception as err:
+            msg = f'Error sending: {err}' if not self.last_call_kafka_error else \
+                f'Error sending: {self.last_call_kafka_error}'
+            raise TransformationError(msg) from err
+        finally:
+            self.last_call_kafka_error = None
+
+    def acknowledge(self, err=None, msg=None, _=None, **kwargs):
+        if err:
+            LOG.error(f'caught error from kafka broker: {err}')
+            self.last_call_kafka_error = err
+        else:
+            LOG.debug(f'caught success from kafka broker')
+
+    def do_work(self, local_context: Dict, kafka: KafkaProducer) -> Dict:
+        # validate the message
+        if not self.helper.validate(local_context):
+            raise TransformationError('Message does not conform to registered schema')
+        if kafka is None:  # don't use "if not kafka" evaluates to false if it's idle
+            raise TransformationError('Message valid, but no Kafka instance in context')
+        # send the message
+        self.helper.produce(local_context, kafka, self.acknowledge)
+        # trigger producer flush to get errors, slower but that's ok
+        kafka.flush()
 
 
 class RestCall(Transformation):

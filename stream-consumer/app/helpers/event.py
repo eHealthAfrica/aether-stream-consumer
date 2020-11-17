@@ -19,6 +19,7 @@
 # under the License.
 
 import json
+from uuid import uuid4
 
 from zeebe_grpc import (
     gateway_pb2
@@ -33,7 +34,7 @@ class Event(object):
 class TestEvent(Event, dict):
     # used for interactive testing
     def __init__(self, *args, **kwargs):
-        # LOG.debug([args, kwargs])
+        self.key = uuid4()
         dict.__init__(self, *args, **kwargs)
 
 

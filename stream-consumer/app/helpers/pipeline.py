@@ -19,9 +19,11 @@
 # under the License.
 
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 import enum
 import json
+from uuid import uuid4
 
 from typing import (
     Callable,
@@ -31,14 +33,18 @@ from typing import (
     Tuple,
 )
 
+from confluent_kafka import Producer as KafkaProducer
+
 from aet.jsonpath import CachedParser
 from aet.resource import ResourceDefinition
 from aet.logger import get_logger
 from aet.kafka import KafkaConsumer, FilterConfig, MaskConfig
 
-from app.config import get_kafka_config
+from app.config import get_kafka_config, get_kafka_admin_config
+from app.fixtures.schemas import ERROR_LOG_AVRO
 from . import TransformationError
 from .event import Event, KafkaMessage, TestEvent, ZeebeJob
+from .kafka import TopicHelper
 from .zb import ZeebeConnection
 
 LOG = get_logger('pipe')
@@ -121,6 +127,22 @@ class Transition:
         return (None, True)
 
 
+@dataclass
+class PipelineResult:
+    success: bool
+    context: 'PipelineContext'
+    error: str = None
+    timestamp: str = field(init=False)
+
+    def __post_init__(self):
+        self.timestamp = datetime.now().isoformat()
+
+    def for_report(self) -> Dict:
+        return {k: getattr(self, k) for k in [
+            'success', 'error', 'timestamp'
+        ]}
+
+
 class PipelineConnection(enum.Enum):
     KAFKA = 1
     ZEEBE = 2
@@ -136,7 +158,8 @@ class PipelineContext(object):
         data: Dict = None  # other data to pass (consts, etc)
     ):
         self.zeebe = zeebe
-        self.kafka = kafka_producer
+        self.kafka_producer = kafka_producer
+        self.event = event
         self.data: OrderedDict[str, Dict] = {}
         if isinstance(event, ZeebeJob):
             self.register_result('source', event.variables)
@@ -201,7 +224,7 @@ class PipelinePubSub(object):
         self.kafka_group_id = kafka_group
         self.definition = definition
         self.kafka_consumer = None
-        self.kafka_producer = None
+        self.kafka_producer = self.__get_kafka_producer()
         self.source_type = None
         self.zeebe: 'ZeebeInstance' = zeebe  # noqa
         self.zeebe_connection: ZeebeConnection = None
@@ -220,6 +243,17 @@ class PipelinePubSub(object):
             kafka_producer=self.kafka_producer,
             data=data
         )
+
+    def __has_kafka_setter(self) -> bool:
+        if 'error_handling' in self.definition:
+            return True
+        return 'kafkamessage' in set(
+            [stage.get('type') for stage in self.definition.get('stages', [])]
+        )
+
+    def __get_kafka_producer(self) -> KafkaProducer:
+        if self.__has_kafka_setter():
+            return KafkaProducer(**get_kafka_admin_config())
 
     def __message_getter(self):
         if not self.source_type:
@@ -318,18 +352,57 @@ class PipelinePubSub(object):
 
 
 class PipelineSet(object):
+
+    # decorator
+    def report(wraps):
+        def fn(*args, **kwargs):
+            self = args[0]
+            context: PipelineContext = args[1]
+            res: PipelineResult = wraps(*args, **kwargs)
+            if not self.error_topic:
+                return res
+            msg = dict({
+                'id': context.event.key if context.event.key else str(uuid4()),
+                'event': context.event.__class__.__name__ if context.event else None,
+                'pipeline': self.pipeline
+            }, **res.for_report())
+            try:
+                del msg['content']
+            except Exception:
+                pass
+            if msg['success'] is False and \
+                    self.definition['error_handling'].get('log_errors', True):
+                self.error_topic.produce(msg, context.kafka_producer)
+            if msg['success'] is True and \
+                    self.definition['error_handling'].get('log_success', False):
+                self.error_topic.produce(msg, context.kafka_producer)
+            return res
+
+        return fn
+
     def __init__(
         self,
+        pipeline: str,
+        tenant: str,
         definition: Dict = None,
         getter: Callable = None,
         stages: List[Stage] = None
     ):
+        self.pipeline = pipeline
+        self.tenant = tenant
+        self.definition = definition or {}
         if stages:
             self.stages = stages
         else:
             if not all([definition, getter]):
                 raise ValueError('PipelineSet requires definition and getter')
             self.stages = self._prepare_stages(definition, getter)
+        # if reports to Kafka:
+        self.error_topic = TopicHelper(
+            json.loads(ERROR_LOG_AVRO),
+            self.tenant,
+            self.definition.get('error_handling').get('error_topic')
+        ) if 'error_handling' in self.definition else None
 
     def _prepare_stages(self, definition, getter: Callable):
         return [
@@ -358,11 +431,20 @@ class PipelineSet(object):
             else:
                 context.register_result(stage.name, {'error': str(ter)})
 
-    def run(self, context: PipelineContext, raise_errors=True):
+    @report
+    def run(self, context: PipelineContext, raise_errors=True) -> PipelineResult:
         for stage in self.stages:
             try:
                 self._execute_stage(stage, context, raise_errors)
             except Exception as err:
-                raise TransformationError(
-                    f'On Stage "{stage.name}": {type(err).__name__}: {err}')
-        return context
+                return PipelineResult(
+                    success=False,
+                    context=context,
+                    error=f'On Stage "{stage.name}": {type(err).__name__}: {err}'
+                )
+        result = PipelineResult(
+            success=True,
+            context=context,
+            error=None
+        )
+        return result

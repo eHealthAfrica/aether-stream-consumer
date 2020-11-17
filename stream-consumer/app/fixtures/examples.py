@@ -218,6 +218,44 @@ XF_JS_CSV_PARSER = {
     'libraries': ['https://cdn.jsdelivr.net/npm/json2csv@4.2.1/dist/json2csv.umd.js']
 }
 
+XF_KAFKA_MESSAGE = {
+    'id': 'error',
+    'name': 'ErrorLogging',
+    'topic': 'errorlog',
+    'schema': {
+        'name': 'error_logger',
+        'type': 'record',
+        'fields': [
+            {
+                'name': 'message',
+                'type': [
+                    'null',
+                    'string'
+                ]
+            },
+            {
+                'name': 'status_code',
+                'type': [
+                    'null',
+                    'int'
+                ]
+            },
+            {
+                'name': 'id',
+                'type': 'string'
+            },
+            {
+                'name': 'timestamp',
+                'type': [
+                    'null',
+                    'string'
+                ],
+                '@aether_extended_type': 'dateTime'
+            }
+        ]
+    }
+}
+
 REST_TRANSFORMATION = {
     'id': 'simple',
     'name': 'simple',
@@ -387,6 +425,50 @@ PIPELINE_ZEEBE = {
                     'message': '$.source.message'
                 },
                 'fail_condition': '$.source.isOdd'  # already a boolean
+            }
+        }
+    ]
+}
+
+
+PIPELINE_KAFKA_LOGS = {
+    'id': 'kafka-report',
+    'name': 'something-different',
+    'kafka_subscription': deepcopy(KAFKA_SUBSCRIPTION),
+    'error_handling': {
+        'error_topic': None,
+        'log_failure': True,
+        'log_success': True
+
+    },
+    'const': {},
+    'stages': [
+        {
+            'name': 'one',
+            'type': 'jscall',
+            'id': 'sizer',
+            'transition': {
+                'input_map': {
+                    'obj': '$.source.message'
+                },
+                'output_map': {
+                    'result': '$.result'
+                }
+            }
+        },
+        {
+            'name': 'two',
+            'type': 'kafkamessage',
+            'id': 'error',
+            'transition': {
+                'input_map': {
+                    'id': '$.source.message._id',
+                    'status_code': '$.one.result',
+                    'message': '$.source.message.operational_status'
+                },
+                'output_map': {
+                    'result': '$.result'
+                }
             }
         }
     ]

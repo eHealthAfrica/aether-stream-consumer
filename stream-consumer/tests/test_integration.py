@@ -74,7 +74,7 @@ def test__deploy_workflow(zeebe_connection, bpmn_echo, bpmn_sort):
     res = next(zeebe_connection.deploy_workflow('sort-flow', bpmn_sort))
     assert(res.workflows is not None)
 
-    
+
 @pytest.mark.integration
 def test__start(StreamConsumer):
     pass
@@ -188,8 +188,8 @@ def test__pipeline_wait_for_resource_init(
 
 
 @pytest.mark.parametrize('_id,body,result_field,result_value,error', [
-    ('add_something', {'value': 1}, 'three', {'result': 4}, None),
-    ('add_something', {'value': "1"}, 'three', {'result': 4}, 400)
+    ('add_something', {'value': 1}, 'success', True, None),
+    ('add_something', {'value': "1"}, 'success', False, 400)
 ])
 @pytest.mark.integration
 def test__pipeline_adder_test(
@@ -296,9 +296,10 @@ def test__pipeline__read_kafka__make_job(
     for x in range(5):
         results = pl.run()
         if results:
+            res: 'PipelineResult'
             for res in results:
-                assert(res[0] is True), res
-                body = res[1]
+                assert(res.success is True), res
+                body = res.context.data
                 if body['two']['result']:
                     odds += 1
                 spawned += 1
@@ -321,3 +322,17 @@ def test__pipeline__read_kafka__make_job(
         else:
             LOG.debug('No work from Zeebe this run...')
     assert(False), f'only found {found} of expected {evens}'
+
+
+@pytest.mark.integration
+def test__pipeline__kafka_msg_and_log(instance_manager_requires_kafka):
+    manager_ = instance_manager_requires_kafka
+    pl = manager_.get('kafka-report', 'pipeline', TENANT)
+    for x in range(5):
+        results = pl.run()
+        if results:
+            res: 'PipelineResult'
+            for res in results:
+                assert(res.success is True), (res.error, res.context.data)
+        else:
+            LOG.debug('No work from Kafka this run...')

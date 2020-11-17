@@ -256,6 +256,14 @@ def test__xf_js_helper_remote_lib(definition):
     assert(reader[1000][1] == 999)
 
 
+@pytest.mark.parametrize('definition', [
+    ResourceDefinition(examples.XF_KAFKA_MESSAGE)
+])
+@pytest.mark.unit
+def test__xf_kafka_message_validate(definition):
+    assert(transforms.KafkaMessage._validate(definition) is True)
+
+
 @pytest.mark.unit
 def test__stage_simple():
     transition = {
@@ -365,19 +373,19 @@ def test__pipelineset_simple():
             name, 'jscall', 'adder', Transition(**deepcopy(transition)), _getter)
         transition['input_map']['a'] = f'$.{name}.result'
         stages.append(stage)
-    pipeline = PipelineSet(stages=stages)
+    pipeline = PipelineSet('some-pipeline', 'sometenant', stages=stages)
     res = pipeline.run(context)
-    assert(res.data['stage9'] == {'result': 10})
+    assert(res.context.data['stage9'] == {'result': 10})
 
 
 @pytest.mark.unit
 def test__Pipeline_adder(loaded_instance_manager):
     p = artifacts.Pipeline(TENANT, examples.PIPELINE_SIMPLE, loaded_instance_manager)
     for x in range(5):
-        data = p.test(**{
+        result = p.test(**{
             'json_body': {'value': 100 + x}
         })
-        assert(data['three']['result'] == 100 + x + 3)
+        assert(result.context.data['three']['result'] == 100 + x + 3)
     with pytest.raises(ConsumerHttpException):
         p.test(**{
             'json_body': {'value': 'a'}
