@@ -156,6 +156,16 @@ version        # (optional) the workflow version you're trying to start
 This is the most specific transform, and will complete an in process ZeebeJob. This only works in a pipeline context that subscribed to a ZeebeJob. It takes a look at the passed in data, and based on a jsonpath evaluation either tells the broker that the job was successful or failed.
 
 
+#### KafkaMessage `/kafkamessage`
+
+This XF allows the production of a message to Kafka. The reasons for doing this are many, you might want to consume some conditionally filtered information as part of a different pipeline, or handle errors in that occur in another XF in another pipeline or consumer, or maybe you want to add some context to the `error_handling` you've setup in your Pipeline. For example, on a failure from a RESTCall XF, you could send the context to a new topic which would be retried by a separate pipeline.
+
+```
+id
+name
+topic          # The name of the topic to be written to. Will be created if it doesn't exist.
+schema         # The avro schema of messages to be produced (NOT stringified, but as a child object of this key)
+```
 
 
 #### Testing Transforms
@@ -272,6 +282,11 @@ Here is a very simple and pretty dumb pipeline, which uses the `strictadder` JSC
     'const': {
         'one': 1,
     },
+    'error_handling': {
+        'error_topic': 'my_log_stream',
+        'log_failure': True,
+        'log_success': True
+    }
     'stages': [
         {
             'name': 'one',
@@ -340,6 +355,49 @@ You can also source messages from kafka to power a pipeline. Simply replace the 
 kafka_subscription: {"topic_pattern": "*"},
 ```
 
+#### Error Handling (optional)
+
+By including an `error_handling` block in your pipeline, you can log the result of each pipeline run to Kafka to topic `error_topic`. The messages will conform to the following schema. If there is no `error_handling` block, errors will only appear ephemerally (last 100)in the log for the job.
+
+`log_failure` will send a message when a pipeline does not complete successfully.
+`log_success` will send a message when a pipeline is successful.
+
+```
+{
+    "name": "Event",
+    "type": "record",
+    "fields": [
+        {
+            "name": "id",
+            "type": "string"
+        },
+        {
+            "name": "event",
+            "type": "string"
+        },
+        {
+            "name": "timestamp",
+            "type": "string",
+            "@aether_extended_type": "dateTime"
+        },
+        {
+            "name": "pipeline",
+            "type": "string"
+        },
+        {
+            "name": "success",
+            "type": "boolean"
+        },
+        {
+            "name": "error",
+            "type": [
+                "null",
+                "string"
+            ]
+        }
+    ]
+}
+```
 
 
 ### Testing Pipelines
