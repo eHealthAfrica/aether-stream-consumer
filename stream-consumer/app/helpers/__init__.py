@@ -70,7 +70,7 @@ def check_required(class_fields):
                     failed.append(f'Expected required fields, missing {missing}')
 
             if len(failed) >= len(fields):
-                raise RuntimeError(f'And '.join(failed))
+                raise RuntimeError('And '.join(failed))
             return f(*args, **kwargs)
         return wrapper
     return inner

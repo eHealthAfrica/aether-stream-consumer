@@ -42,7 +42,9 @@ def load_config():
     global kafka_config
     kafka_config = Settings(
         file_path=KAFKA_CONFIG_PATH,
-        alias={'BOOTSTRAP.SERVERS': 'KAFKA_URL'},
+        alias={
+            'BOOTSTRAP.SERVERS': 'KAFKA_URL',
+        },
         exclude=['KAFKA_URL']
     )
 
@@ -50,14 +52,25 @@ def load_config():
 def get_kafka_config():
     # load security settings in from environment
     # if the security protocol is set
-    if kafka_config.get('SECURITY.PROTOCOL'):
-        for i in [
-            'SECURITY.PROTOCOL',
-            'SASL.MECHANISM',
-            'SASL.USERNAME',
-            'SASL.PASSWORD'
-        ]:
-            kafka_config[i] = kafka_config.get(i)
+    required = [
+        ('SECURITY.PROTOCOL', 'KAFKA_CONSUMER_SECURITY_PROTOCOL'),
+        ('SASL.MECHANISM', 'KAFKA_CONSUMER_SASL_MECHANISM'),
+        ('SASL.USERNAME', 'KAFKA_CONSUMER_USER'),
+        ('SASL.PASSWORD', 'KAFKA_CONSUMER_PASSWORD')
+    ]
+    protocol = kafka_config.get('SECURITY.PROTOCOL') or \
+        kafka_config.get('KAFKA_CONSUMER_SECURITY_PROTOCOL')
+    if protocol:
+        for name, alias in required:
+            if not kafka_config.get(name):
+                kafka_config[name] = kafka_config.get(alias)
+            else:
+                kafka_config[name] = kafka_config.get(name)
+        missing = [name for name, _ in required if name not in kafka_config]
+        if any(missing):
+            raise RuntimeError(f'Missing Required Kafka Configuration : {missing}')
+    elif not kafka_config.get('INSECURE_KAFKA', False):
+        raise RuntimeError('Security Protocol not set for Kafka, and not marked insecure')
     return kafka_config
 
 
