@@ -353,7 +353,7 @@ class KafkaMessage(Transformation):
             LOG.error(f'caught error from kafka broker: {err}')
             self.last_call_kafka_error = err
         else:
-            LOG.debug(f'caught success from kafka broker')
+            LOG.debug('caught success from kafka broker')
 
     def do_work(self, local_context: Dict, kafka: KafkaProducer) -> Dict:
         # validate the message
