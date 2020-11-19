@@ -81,7 +81,7 @@ class Transition:
                 for k, v in obj.items()
             }
             # filter out nones so key presence doesn't cause overwrite on merge
-            return {k: v for k, v in res.items() if v}
+            return {k: v for k, v in res.items() if v is not None}
 
     @staticmethod
     def apply_merge_dicts(_map: Dict, a: Dict, b: dict):
