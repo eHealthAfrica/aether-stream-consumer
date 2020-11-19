@@ -31,6 +31,7 @@ from typing import (
     Iterable,
     List,
     Tuple,
+    Union,
 )
 
 from confluent_kafka import Producer as KafkaProducer
@@ -67,14 +68,20 @@ class Transition:
                 return [i.value for i in matches][0]
 
     @staticmethod
-    def apply_map(map: Dict, context: Dict) -> Dict:
-        _mapped = {
-            k: Transition.handle_parser_results(
-                CachedParser.find(v, context)) for
-            k, v in map.items()
-        }
-        # filter out nones so key presence doesn't cause overwrite on merge
-        return {k: v for k, v in _mapped.items() if v is not None}
+    def apply_map(obj: Union[str, List, Dict], context: Dict):
+        if isinstance(obj, str) and obj.startswith('$.'):
+            return Transition.handle_parser_results(CachedParser.find(obj, context))
+        elif isinstance(obj, str):
+            return obj
+        elif isinstance(obj, list):
+            return [Transition.apply_map(i, context) for i in obj]
+        elif isinstance(obj, dict):
+            res = {
+                k: Transition.apply_map(v, context)
+                for k, v in obj.items()
+            }
+            # filter out nones so key presence doesn't cause overwrite on merge
+            return {k: v for k, v in res.items() if v is not None}
 
     @staticmethod
     def apply_merge_dicts(_map: Dict, a: Dict, b: dict):

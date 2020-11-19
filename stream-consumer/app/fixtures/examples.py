@@ -56,8 +56,26 @@ BASE_TRANSFORMATION = {
 }
 
 BASE_TRANSITION = {
-    'input_map': {'ref': '$.source.ref'},
-    'output_map': {'ref': '$.ref'}
+    'input_map': {
+        'ref': '$.source.ref',
+        'const': 'a',
+        'list': [
+            '$.source.ref',
+            '$.source.ref'
+        ],
+        'dict': {
+            'a': '$.source.ref',
+            'b': 'b'
+        }
+    },
+    'output_map': {
+        'ref': '$.ref',
+        'list': ['$.list[0]'],
+        'const': 'c',
+        'dict': {
+            'f': '$.dict.a'
+        }
+    }
 }
 
 BASE_TRANSITION_PASS = dict(BASE_TRANSITION)

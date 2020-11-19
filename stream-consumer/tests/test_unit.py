@@ -56,7 +56,12 @@ def test__Transformation_basic(BaseTransition):
     trans = transforms.Transformation('_id', examples.BASE_TRANSFORMATION, None)
     context = PipelineContext()
     context.register_result('source', {'ref': 200})
-    assert(trans.run(context, Transition(**examples.BASE_TRANSITION_PASS)) == {'ref': 200})
+    assert(trans.run(context, Transition(**examples.BASE_TRANSITION_PASS)) == {
+        'ref': 200,
+        'list': [200],
+        'const': 'c',
+        'dict': {'f': 200}
+    })
     context.register_result('source', {'ref': 500})
     with pytest.raises(TransformationError):
         trans.run(context, Transition(**examples.BASE_TRANSITION_PASS))
