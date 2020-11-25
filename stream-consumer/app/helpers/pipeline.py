@@ -261,6 +261,10 @@ class PipelinePubSub(object):
             data=data
         )
 
+    def commit(self):
+        if self.kafka_consumer:
+            self.kafka_consumer.commit()
+
     def __has_kafka_setter(self) -> bool:
         if 'error_handling' in self.definition:
             return True
@@ -343,7 +347,7 @@ class PipelinePubSub(object):
 
     def _apply_consumer_filters(self, topic):
         try:
-            opts = self.definition['kafka_subscription']['topic_options']
+            opts = self.definition['kafka_subscription'].get('topic_options', {})
             _flt = opts.get('filter_required', False)
             if _flt:
                 _filter_options = {

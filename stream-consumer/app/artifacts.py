@@ -218,6 +218,10 @@ class Pipeline(BaseResource):
         results = []
         for ctx in self.pubsub.get():
             results.append(self.pipeline_set.run(ctx))
+        try:
+            self.pubsub.commit()
+        except Exception as err:
+            LOG.error(f'could not commit offset read to kafka: {err}')
         return results
 
     # public!
