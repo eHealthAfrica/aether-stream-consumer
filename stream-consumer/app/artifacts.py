@@ -232,8 +232,8 @@ class Pipeline(BaseResource):
             context = self.pubsub.test(TestEvent(**message))
             result = self.pipeline_set.run(context)
             if result.error:
-                raise RuntimeError(json.dumps(context))
-            return result
+                raise RuntimeError(result.to_json())
+            return json.loads(result.to_json())
         except Exception as err:
             raise ConsumerHttpException(err, 400)
 
