@@ -18,11 +18,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import requests
-from requests.auth import HTTPBasicAuth
+import dns.resolver
 from urllib.parse import urlparse
 
-import dns.resolver
+import requests
+from requests.auth import HTTPBasicAuth
 
 from . import check_required
 
