@@ -390,7 +390,7 @@ def test__Pipeline_adder(loaded_instance_manager):
         result = p.test(**{
             'json_body': {'value': 100 + x}
         })
-        assert(result.context.data['three']['result'] == 100 + x + 3)
+        assert(result['context']['three']['result'] == 100 + x + 3)
     with pytest.raises(ConsumerHttpException):
         p.test(**{
             'json_body': {'value': 'a'}

@@ -149,6 +149,15 @@ class PipelineResult:
             'success', 'error', 'timestamp'
         ]}
 
+    def to_json(self) -> str:
+        return json.dumps(
+            dict(
+                **{k: getattr(self, k) for k in [
+                    'success', 'error', 'timestamp'
+                ]}, **{'context': self.context.data}
+            ),
+            indent=2)
+
 
 class PipelineConnection(enum.Enum):
     KAFKA = 1
@@ -193,8 +202,8 @@ class PipelineContext(object):
     def last(self) -> Dict:
         return self.data.get(list(self.data.keys())[-1])
 
-    def to_json(self):
-        return json.dumps(self.data)
+    def to_json(self) -> str:
+        return json.dumps(self.data, indent=2)
 
 
 @dataclass
@@ -251,6 +260,10 @@ class PipelinePubSub(object):
             kafka_producer=self.kafka_producer,
             data=data
         )
+
+    def commit(self):
+        if self.kafka_consumer:
+            self.kafka_consumer.commit()
 
     def __has_kafka_setter(self) -> bool:
         if 'error_handling' in self.definition:
@@ -334,7 +347,7 @@ class PipelinePubSub(object):
 
     def _apply_consumer_filters(self, topic):
         try:
-            opts = self.definition['kafka_subscription']['topic_options']
+            opts = self.definition['kafka_subscription'].get('topic_options', {})
             _flt = opts.get('filter_required', False)
             if _flt:
                 _filter_options = {
@@ -372,7 +385,7 @@ class PipelineSet(object):
             if not self.error_topic:
                 return res
             msg = dict({
-                'id': context.event.key if context.event.key else str(uuid4()),
+                'id': str(context.event.key) if context.event.key else str(uuid4()),
                 'event': context.event.__class__.__name__ if context.event else None,
                 'pipeline': self.pipeline
             }, **res.for_report())
