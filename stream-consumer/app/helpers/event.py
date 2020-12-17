@@ -34,7 +34,7 @@ class Event(object):
 class TestEvent(Event, dict):
     # used for interactive testing
     def __init__(self, *args, **kwargs):
-        self.key = uuid4()
+        self.key = kwargs.get('id') or str(uuid4())
         dict.__init__(self, *args, **kwargs)
 
 
@@ -66,7 +66,10 @@ class ZeebeJob(Event):
 
 class KafkaMessage(Event):
     def __init__(self, msg):
-        self.key = msg.key
+        try:
+            self.key = msg.key or msg.value.get('id')
+        except Exception:
+            self.key = None
         self.topic = msg.topic
         self.value = msg.value
         self.schema = msg.schema
