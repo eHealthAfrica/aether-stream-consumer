@@ -25,6 +25,7 @@ KAFKA_SUBSCRIPTION = {
     'id': 'sub-test',
     'name': 'Test Subscription',
     'topic_pattern': '*',
+    'auto_offset_reset': 'earliest',
     'topic_options': {
         'masking_annotation': '@aether_masking',  # schema key for mask level of a field
         'masking_levels': ['public', 'private'],  # classifications
