@@ -290,7 +290,10 @@ class PipelinePubSub(object):
 
     def __make_kafka_getter(self):
         args = {k.lower(): v for k, v in KAFKA_CONFIG.copy().items()}
+        # the usual Kafka Client Configuration
         args['group.id'] = self.kafka_group_id
+        args['auto.offset.reset'] = \
+            self.definition['kafka_subscription'].get('auto_offset_reset', 'earliest')
         self.kafka_consumer = KafkaConsumer(**args)
         pattern = self.definition['kafka_subscription'].get('topic_pattern', '*')
         # only allow regex on the end of patterns

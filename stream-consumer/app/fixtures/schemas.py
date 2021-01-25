@@ -451,6 +451,18 @@ PIPELINE = '''
           ],
           "pattern": "^(.*)$"
         },
+        "auto_offset_reset": {
+          "$id": "#/properties/auto_offset_reset",
+          "type": "string",
+          "title": "Kafka Consumer -> (auto.offset.reset)",
+          "enum": ["earliest", "latest"],
+          "default": "earliest",
+          "examples": [
+            "earliest",
+            "latest"
+          ],
+          "pattern": "^(.*)$"
+        },
         "topic_options": {
           "$id": "#/properties/topic_options",
           "type": "object",
