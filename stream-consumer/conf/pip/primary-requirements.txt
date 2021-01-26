@@ -9,7 +9,7 @@
 #################################################################################################
 
 # Consumer
-aet.consumer>=3.10.1
+aet.consumer>=3.11.0
 aether.python
 dnspython
 quickjs
