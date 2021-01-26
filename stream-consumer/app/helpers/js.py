@@ -93,7 +93,7 @@ class JSHelper(object):
                 self._setup()
             except Exception as err:
                 LOG.critical(err)
-                raise TransformationError('could not setup jscall') from err
+                raise TransformationError(f'could not setup jscall: {err}') from err
         args = self._prepare_arguments(input)
         try:
             res = self._function(*args)
