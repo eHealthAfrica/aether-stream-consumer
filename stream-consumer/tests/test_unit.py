@@ -262,6 +262,29 @@ def test__xf_js_helper_remote_lib(definition):
 
 
 @pytest.mark.parametrize('definition', [
+    ResourceDefinition(examples.XF_JS_STRING_OPERATION)
+])
+@pytest.mark.unit
+def test__xf_js_helper_string_op(definition):
+    num = '+15555019999'
+    input = {'base': num}
+    h = JSHelper(definition)
+    res = h.calculate(input)
+    assert(res['result'] == [f'tel:{num}'])
+
+
+@pytest.mark.parametrize('definition', [
+    ResourceDefinition(examples.XF_JS_STRING_OPERATION),
+    ResourceDefinition(examples.XF_JS_FORMAT_DOC),
+    ResourceDefinition(examples.XF_JS_FORMATTER)
+])
+@pytest.mark.unit
+def test__xf_js_helper_string_op(definition):
+    h = JSHelper(definition)
+    assert(h is not None)
+
+
+@pytest.mark.parametrize('definition', [
     ResourceDefinition(examples.XF_KAFKA_MESSAGE)
 ])
 @pytest.mark.unit

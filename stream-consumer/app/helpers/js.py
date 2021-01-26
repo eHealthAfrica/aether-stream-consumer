@@ -32,7 +32,12 @@ from typing import (  # noqa
 )
 
 from aet.resource import ResourceDefinition
+from aet.logger import get_logger
+
 from . import TransformationError, type_checker
+
+
+LOG = get_logger('JS')
 
 
 class JSHelper(object):
@@ -44,8 +49,16 @@ class JSHelper(object):
         return res.text
 
     def __init__(self, definition: ResourceDefinition):
-        self._prepare_function(definition)
-        self._prepare_arguments = self._make_argument_parser(definition.arguments)
+        self._function = None
+        self.definition = definition
+        try:
+            self._setup()
+        except Exception as err:
+            LOG.critical(err)
+
+    def _setup(self):
+        self._prepare_function(self.definition)
+        self._prepare_arguments = self._make_argument_parser(self.definition.arguments)
 
     def _prepare_function(self, definition: ResourceDefinition):
         script = definition.script
@@ -75,6 +88,12 @@ class JSHelper(object):
             return _fn
 
     def calculate(self, input: Dict) -> Any:
+        if not self._function:
+            try:
+                self._setup()
+            except Exception as err:
+                LOG.critical(err)
+                raise TransformationError('could not setup jscall') from err
         args = self._prepare_arguments(input)
         try:
             res = self._function(*args)

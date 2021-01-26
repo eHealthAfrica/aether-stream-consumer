@@ -237,6 +237,40 @@ XF_JS_CSV_PARSER = {
     'libraries': ['https://cdn.jsdelivr.net/npm/json2csv@4.2.1/dist/json2csv.umd.js']
 }
 
+XF_JS_STRING_OPERATION = {
+    'id': 'urn',
+    'name': 'URN Formatter',
+    'entrypoint': 'fn',
+    'script': '''function fn(base){return ['tel:' + base.toString()];}''',
+    'arguments': ['base']
+}
+
+XF_JS_FORMAT_DOC = {
+    'arguments': [
+        'aether_url',
+        'sd_id',
+        'filter_on',
+        'doc'
+    ],
+    'entrypoint': 'f',
+    'id': 'format_doc',
+    'name': 'Document Formatter',
+    'script': '''function f(aether_url, sd_id, filter_on, doc){\n\treturn {\"aether_url\": aether_url,\"look_up_entity_type\": sd_id,\"look_up_filter_key\": filter_on,\"look_up_value\": doc.contact_id,\"sms_content\": doc.sms_body,\"trigger_id\": doc.id,\"timestamp\": doc.modified};\n}'''  # noqa
+}
+
+XF_JS_FORMATTER = {
+    'arguments': [
+        'aether_url',
+        'sd_id',
+        'filter_on',
+        'doc'
+    ],
+    'entrypoint': 'f',
+    'id': 'formatter',
+    'name': 'Document Formatter',
+    'script': '''function f(t,e,_,o){return{aether_url:t,look_up_entity_type:e,look_up_filter_key:_,look_up_value:o.contact_id,sms_content:o.sms_body,trigger_id:o.id,timestamp:(new Date).toISOString()}}'''  # noqa
+}
+
 XF_KAFKA_MESSAGE = {
     'id': 'error',
     'name': 'ErrorLogging',
