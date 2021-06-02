@@ -61,7 +61,7 @@ six==1.14.0
 soupsieve==2.0
 spavro==1.1.23
 toml==0.10.2
-urllib3==1.25.10
+urllib3==1.26.5
 waitress==1.4.3
 wcwidth==0.1.9
 WebOb==1.8.6
