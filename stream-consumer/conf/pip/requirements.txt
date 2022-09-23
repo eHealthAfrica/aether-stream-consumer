@@ -42,7 +42,7 @@ more-itertools==8.2.0
 packaging==20.3
 pluggy==0.13.1
 ply==3.11
-protobuf==3.14.0
+protobuf==3.18.3
 py==1.9.0
 pycodestyle==2.6.0
 pycparser==2.20
